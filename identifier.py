@@ -89,8 +89,6 @@ def neighbor_in_R(lat,positions,center,R,ntypes,ename):
     neighbors = np.append(neighbors, closeP)
     neighbors = np.append(neighbors, r)
  neighbors = np.reshape(neighbors, (len(neighbors)/6,6))
- # test = neighbors[:]
- # neighbors = neighbors[neighbors[:,-1].argsort(kind='mergesort')]
  return neighbors #[...,['Element','index','x','y','z','r'],...]
 
 def getAngle(v1,v2): #radian
