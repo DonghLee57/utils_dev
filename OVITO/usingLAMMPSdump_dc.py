@@ -6,18 +6,6 @@
 from ovito.data import *
 import numpy as np
 
-def getDIS(lat,pos1,pos2):#Position arguments should be Cartensian.
- real_dist = 9999
- for a in range(-1,2):
-  for b in range(-1,2):
-   for c in range(-1,2):
-    trans_pos = pos2 + a*lat[0] + b*lat[1] + c*lat[2]
-    dist = sum((pos1-trans_pos)**2)**0.5
-    if dist < real_dist:
-     real_dist = dist
-     Disp = trans_pos-pos1
- return real_dist, Disp
- 
 def modify(frame, data):
     cols = ['c_tot[3]','c_tot[5]']
     Q8 = data.particles[cols[0]]
