@@ -24,6 +24,7 @@ def modify(frame, data):
     Q12 = data.particles[cols[1]]
     
     cr_val = 0.20
+    n_nei = 3
     cutoff = 3.2
     
     c_code = [0.2, 0.6, 0.8] #R, G, B
@@ -40,13 +41,13 @@ def modify(frame, data):
         else: tag2.append(False)
     
     finder = CutoffNeighborFinder(cutoff, data)
-#    for idx in range(data.number_of_particles):
-#        NV_list = []
-#        for neigh in finder.find(idx):
-#            tag1[neigh.index] 
-
-    
-    
-        if tag1 and tag2:
+    for idx in range(data.number_of_particles):
+        NV_list = []
+        c = 0
+        for neigh in finder.find(idx):
+            if tag1[neigh.index] and tag2[neigh.index]: c += 1
+            else: break
+        if c >= n_nei:
             colors[idx] = np.array(c_code)
+    
     data.particles_.create_property('Color', data=colors)
