@@ -1,7 +1,6 @@
 #python script for OVITO
 #sc: tags are considered once.
 #dc: tags are considered upto the its first neighbors.
-#tc: #dc: tags are considered upto the its second neighbors.
 
 from ovito.data import *
 import numpy as np
