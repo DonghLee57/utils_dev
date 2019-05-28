@@ -1,8 +1,9 @@
 # 
-# Calculate the average bond order parameter Q
+# Calculate the local bond order parameter q_l(i)
 # Ref.
-#   J. Chem. Phys. 129, 114707 (2008).
-#   J. Phys. Chem. C 121, 23827 (2017).
+#   https://lammps.sandia.gov/doc/compute_orientorder_atom.html
+#   J. Chem. Phys. 129, 114707 (2008). eq (3)
+#   J. Chem. Phys. 138, 044501 (2013). eq (1) & Table I.
 #
 # Python ~.py POSCAR.vasp
 # output: LAMMPS dump style
