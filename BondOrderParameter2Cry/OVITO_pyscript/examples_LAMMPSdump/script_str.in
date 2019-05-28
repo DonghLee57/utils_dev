@@ -1,0 +1,18 @@
+echo            both
+boundary        p p p
+units           metal
+
+atom_style      atomic
+box tilt large
+read_data       res.dat
+
+pair_style      nn
+pair_coeff      * * potential_saved Ge Te 
+
+compute         TOT all orientorder/atom degrees 5 4 6 8 10 12 nnn NULL cutoff 6.0
+dump 	mydump	all custom 1 str.dump id type x y z c_TOT[*]
+
+run 1
+
+
+
