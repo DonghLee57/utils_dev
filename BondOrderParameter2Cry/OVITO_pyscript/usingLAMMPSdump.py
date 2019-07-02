@@ -41,7 +41,6 @@ def modify(frame, data):
             c = 0
             for neigh in finder.find(idx):
                 if tag1[neigh.index] and tag2[neigh.index]: c += 1
-                else: break
             if c >= n_nei:
                 #colors[idx] = np.array(c_code)
                 trans[idx] = np.array(0)
