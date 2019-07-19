@@ -64,7 +64,7 @@ def modify(frame, data):
                 test.append(checker[neigh.index])
             if True not in test:
                 trans[idx] = np.array(1)
-            else: numC += 1
+            if trans[idx] ==0: numC += 1
                 
     #data.particles_.create_property('Color', data=colors)
     data.particles_.create_property('Transparency', data=trans)
