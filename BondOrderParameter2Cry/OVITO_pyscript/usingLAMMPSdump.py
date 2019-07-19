@@ -2,6 +2,8 @@ from ovito.data import *
 import numpy as np
 
 def modify(frame, data):
+    fwritedat = False
+    fwriteLOC = r'D:\\' # if fwritedat == True, assign the path to save data.
     looptag = ['sc','dc','dc-isolated']
     tag = 'dc-isolated'
     cols = ['c_tot[3]','c_tot[5]']
@@ -11,8 +13,7 @@ def modify(frame, data):
     cr_val = 0.21
     cutoff = 3.2
     n_nei  = 3
-    c_code = [0.2, 0.6, 0.8] #R, G, B
-
+    #c_code = [0.2, 0.6, 0.8] #R, G, B
     #colors = np.ones((data.particles.count, 3))
     #data.particles_.create_property('Color', data=colors)
     trans = np.ones(data.particles.count)
@@ -21,7 +22,7 @@ def modify(frame, data):
     #
     tag1 = []
     tag2 = []
-
+    numC = 0
     for idx in range(data.number_of_particles):
        if Q8[idx] > cr_val:
            tag1.append(True)
@@ -35,6 +36,7 @@ def modify(frame, data):
             if tag1[idx] and tag2[idx]:
                 #colors[idx] = np.array(c_code)
                 trans[idx] = np.array(0)
+                numC += 1
     elif tag == looptag[1]:#Consider the first neigbors of the atom
         finder = CutoffNeighborFinder(cutoff, data)
         for idx in range(data.number_of_particles):
@@ -44,6 +46,7 @@ def modify(frame, data):
             if c >= n_nei:
                 #colors[idx] = np.array(c_code)
                 trans[idx] = np.array(0)
+                numC += 1
     elif tag == looptag[2]:#After considering the first neighbors, remove isolated crystalline atoms
         checker = [False]*data.number_of_particles
         finder = CutoffNeighborFinder(cutoff, data)
@@ -60,7 +63,15 @@ def modify(frame, data):
             for neigh in finder.find(idx):
                 test.append(checker[neigh.index])
             if True not in test:
-                trans[idx] = np.array(1) 
+                trans[idx] = np.array(1)
+            else: numC += 1
                 
     #data.particles_.create_property('Color', data=colors)
     data.particles_.create_property('Transparency', data=trans)
+    if fwritedat:
+        if frame ==0:
+            output = open(fwriteLOC+'num.Crystal.txt','w')
+            output.write('%d\t%d\n' (%frame,numC))
+        else:
+            output = open(fwriteLOC+'num.Crystal.txt','a+')
+            output.write('%d\t%d\n' %(frame,numC))
