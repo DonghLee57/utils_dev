@@ -1,0 +1,33 @@
+ SYSTEM = IGZO
+ Starting parameters for this run:
+   NWRITE =      2    write-flag
+   ISTART =      0    job   : 0-new, 1-cont, 2-samecut
+   ICHARG =      2    charge: 0-wave, 1-file, 2-atom, >10-const
+#   ISPIN  =      2
+   INIWAV =      1    electr: 0-lowe 1-rand  2-diag
+
+ Electronic Relaxation:
+   ENCUT  =   400    electronvolot
+   PREC   =   normal    normal | accurate
+   ADDGRID = .T.
+   NELMDL =     -5    number of delayed ELM steps
+   NELM   =    100    number of ELM steps
+   EDIFF  =  1E-06    energy stopping-criterion for ELM
+   LREAL  =  False    real-space projection (.FALSE., .TRUE., On, Auto)
+   ALGO   =  Fast   Normal (DAVIDSON), Fast(DAVIDSON-DIIS), Very_Fast (DIIS)
+
+ Ionic Relaxation:
+   NSW    =    0   max number of geometry steps
+   IBRION =    2    ionic relax: 0-MD, 1-quasi-Newton, 2-CG, 3-Damped MD
+   EDIFFG =   -0.02  force (eV/A) stopping-criterion for geometry steps
+   ISIF   =    3     (1:force=y stress=trace only ions=y shape=n volume=n)
+   ISYM   =    1     (1-use symmetry, 0-no symmetry)
+
+ DOS related values:
+   ISMEAR =    0     (-1-Fermi, 1-Methfessel/Paxton)
+   SIGMA  =     0.05  broadening in eV
+
+     LORBIT = 11
+     NPAR = 2
+     NBLOCK = 1
+     KBLOCK = 1
