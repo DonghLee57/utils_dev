@@ -8,9 +8,6 @@
 #  3) bin in x,y, or z direction
 #  4) plot pdos of the allocated atoms
 #
-
-winPATH = "c:/Users/2078450/Downloads/code test/"
-
 import numpy as np
 import matplotlib.pyplot as plt
 
