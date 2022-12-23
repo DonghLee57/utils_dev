@@ -113,14 +113,14 @@ def readDOSCAR(filename, ISPIN):
 def fit_density(target_rho, lat, types, atoms):
    #target: The target density (unit: g/cm3)
    Na = 6.022E+23
-   dic_mass = {'O':16.00,'Hf':178.49}
+   dic_mass = {'O':16.00,'Zr':91.224,'Hf':178.49}
    V = np.linalg.det(lat)
    Tot_mass = 0
    for i in range(len(types)):
       Tot_mass += dic_mass[types[i]]*atoms[i]
    # Unit: g/cm3
    given_rho = Tot_mass/V/Na*10**24
-   fit_lat = (target_rho/given_rho)**(1/3.)*lat
+   fit_lat = (given_rho/target_rho)**(1/3.)*lat
    return fit_lat
 
 #--------------------------------------------------------------------------------------
