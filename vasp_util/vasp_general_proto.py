@@ -167,6 +167,16 @@ def get_DIST(lat, pos_i, pos_j):
                     dist = eval_dist
     return dist
 
+def get_ANG(lat,pos1,pos2,pos3):
+    #Position arguments should be Cartensian.
+    #pos1 : Center atom
+    #pos2,3 : Neighboring atoms
+    a = get_DIST(lat,pos2,pos3)
+    b = get_DIST(lat,pos1,pos2)
+    c = get_DIST(lat,pos1,pos3)
+    #Unit of output : degree
+    return np.arccos((b**2+c**2-a**2)/(2*b*c))*180/np.pi
+
 #--------------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
