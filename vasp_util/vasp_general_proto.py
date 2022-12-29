@@ -132,6 +132,28 @@ def readDOSCAR(filename, ISPIN):
     else:
         return TDOS, 0, fermi
 
+def readOUTCAR(filename):
+    out_info={'E':[],\
+              'lat':np.zeros((3,3)),\
+              'ntypes':None,\
+              'NIONS':0}
+    o = enumerate(open(filename,'r'))
+    for idx, line in o:
+        tmp = line.split()
+        # NIONS, types, lat, coordinates, forces?
+        if len(tmp) > 0:
+            if 'NIONS' in tmp: out_info['NIONS'] = int(tmp[-1])
+            elif 'type' in tmp and 'ions' in tmp:
+                out_info['ntypes'] = list(map(int,tmp[4:]))
+            elif 'lattice' in tmp and len(tmp) ==6:
+                out_info['lat'][0] = list(map(float,next(o)[-1].split()[:3]))
+                out_info['lat'][1] = list(map(float,next(o)[-1].split()[:3]))
+                out_info['lat'][2] = list(map(float,next(o)[-1].split()[:3]))
+            elif 'ENERGIE' in tmp:
+                next(o)
+                out_info['E'].append(float(next(o)[1].split()[-2]))
+    return out_info
+    
 def fit_density(target_rho, lat, types, atoms):
    #target: The target density (unit: g/cm3)
    Na = 6.022E+23
