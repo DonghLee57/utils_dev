@@ -1,7 +1,6 @@
 # python3.X
 # python mol2vasp.py ~.mol > POSCAR.vasp
 import sys
-import glob, shutil
 import numpy as np
 
 files = [sys.argv[1]]
