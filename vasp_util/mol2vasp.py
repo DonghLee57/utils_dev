@@ -36,9 +36,7 @@ for f in range(len(files)):
        r = np.linalg.norm(coords[i]-com)
        print(com, coords[i], r, dist, r > dist)
        if r > dist: dist = r
-    
     lat = 2*dist+10
-    print(r, lat)
     trans_vec = np.array([lat/2]*3) - com
 
     # Generate POSCAR
