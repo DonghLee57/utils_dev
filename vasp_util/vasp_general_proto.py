@@ -157,7 +157,10 @@ def readOUTCAR(filename):
 def fit_density(target_rho, lat, types, atoms):
    #target: The target density (unit: g/cm3)
    Na = 6.022E+23
-   dic_mass = {'O':16.00,'Zr':91.224,'Hf':178.49}
+   dic_mass = {'C':12.011,'N':14.001,'O':16.00,\
+               'Al':26.981,'Si':28.085,\
+               'Zr':91.224,'Mo':95.940,\
+               'Hf':178.49,'Ta':180.948,'W':183.850}
    V = np.linalg.det(lat)
    Tot_mass = 0
    for i in range(len(types)):
