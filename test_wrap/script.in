@@ -6,12 +6,11 @@ box tilt        large
 read_data       str.dat
 
 pair_style      nn
-#pair_coeff     * * NNP_set0_5000 Ti N Cl
-pair_coeff      * * NNP_set0_5000 N Ti Cl
+pair_coeff      * * NNP A B C
 
-mass            1 47.880
-mass            2 14.001
-#mass           3 35.453
+mass            1 1
+mass            2 2
+mass           3 3
 
 #thermo                 1
 #thermo_modify  lost ignore flush yes
