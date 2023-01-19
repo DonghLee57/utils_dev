@@ -1,0 +1,25 @@
+units           metal
+boundary        p p p
+atom_style      atomic
+
+box tilt        large
+read_data       str.dat
+
+pair_style      nn
+#pair_coeff     * * NNP_set0_5000 Ti N Cl
+pair_coeff      * * NNP_set0_5000 N Ti Cl
+
+mass            1 47.880
+mass            2 14.001
+#mass           3 35.453
+
+#thermo                 1
+#thermo_modify  lost ignore flush yes
+
+#neighbor       2 bin
+#neigh_modify   every 10 delay 0 check yes page 300000 one 30000
+
+### Default timestep
+#timestep 0.001
+
+run 0
