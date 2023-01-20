@@ -7,6 +7,20 @@ import ase.io
 from ase import Atoms
 
 def main():
+    # For calculating energy difference, energies of the reactant, product molecules should calculated.
+    mol_list = glob.glob('./molecules/*')
+    mol_E = {}
+    for idx, m in enumerate(mol_list):
+        mol = ase.io.read(m,index=':',format='vasp')
+        types = list(set(mol[0].get_chemical_symbols()))
+        ase.io.write(str4lmp, images=mol, format='lammps-data')
+        write_lmp_script(str4lmp,nnp,types)
+
+        lmp = lammps.lammps()
+        lmp.file('py_script.in')
+        mol_E[m.split('_')[-1]] = get_lmp_log('energy')
+        lmp.close()
+
     input_str = sys.argv[1]
     str4lmp = sys.argv[2]
     nnp = sys.argv[3]
@@ -23,7 +37,21 @@ def main():
     lmp.close()
 
 def write_lmp_script(str_name, pot_name, elements):
-    e_dict={'H':1, 'N':7, 'O':8, 'Cl':17,'Ti':22,'Mo':42}
+    periodic_table = [
+    'H', 'He',
+    'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+    'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar',
+    'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn','Ga', 'Ge', 'As', 'Se', 'Br', 'Kr',
+    'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd','In', 'Sn', 'Sb', 'Te', 'I', 'Xe',
+    'Cs', 'Ba',    'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb', 'Lu',
+               'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi','Po', 'At', 'Rn',
+    'Fr', 'Ra',    'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk','Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
+               'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc','Lv', 'Ts', 'Og']
+    e_dict ={}
+    for Z,symbol in enumerate(periodic_table):
+        e_dict[symbol] = Z+1
+    # In the present ASE, num(Cl) < num(N)...
+    e_dict['Cl'] = 6
     mass_dict={'H':1, 'N':14.001, 'O':15.999, 'Cl':35.453,'Ti':47.880}
     o=open(pot_name,'r').readline()
     pot_elements = o.split()[1:]
