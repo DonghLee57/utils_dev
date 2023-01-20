@@ -5,12 +5,15 @@ atom_style      atomic
 box tilt        large
 read_data       str.dat
 
+# if N elements in ELEM LIST in 'NNP'
+# pair_coeff      * * NNP 1 2 ... N
+# else, segmentation error
 pair_style      nn
 pair_coeff      * * NNP A B C
 
 mass            1 1
 mass            2 2
-mass           3 3
+mass            3 3
 
 #thermo                 1
 #thermo_modify  lost ignore flush yes
