@@ -10,21 +10,26 @@ def main():
     input_str = sys.argv[1]
     str4lmp = sys.argv[2]
     nnp = sys.argv[3]
-
+    insert_mol = sys.argv[4]
+    
     # For calculating energy difference, energies of the reactant, product molecules should calculated.
     mol_list = glob.glob('./molecules/*')
     mol_E = {}
     for idx, m in enumerate(mol_list):
-        mol_E[m.split('_')[-1]] = get_lmp_E(m,nnp)
+        mol = ase.io.read(m,index=':',format='vasp')
+        mol_E[m.split('_')[-1]] = get_lmp_E(mol,nnp)
 
     base = ase.io.read(input_str,index=':',format='vasp')
-    E_old= get_lmp_E(input_str, nnp)
-    
-    # Scan the active sites for precursors or reactants
-    # Insert the molecule as the product form and calculate the energy difference
-    # Insert algorithm !!!
-    
+    E_old = get_lmp_E(base, nnp)
 
+    # Scan the active sites for precursors or reactants
+    # Insert the molecule as the product form
+    base_new  = insert_molecule(base, insert_mol)
+    E_new = get_lmp_E(base_new,nnp)
+
+    # Reaction: surface + insert_mol -> (surface+insert_mol*) + product
+    
+    
 def write_lmp_script(str_name, pot_name, elements):
     periodic_table = [
     'H', 'He',
@@ -86,6 +91,56 @@ def get_lmp_E(poscar, nnp, str4lmp='str.dat'):
     E = get_lmp_log('energy')
     lmp.close()
     return E
+
+def insert_molecule(base, mol_name):
+    lat= base[0].cell
+    ilat= np.linalg.inv(lat)
+    types = base[0].get_chemical_symbols()
+
+    # Search the active sites on surface
+    ### crt_h...arbitrary now...
+    crt_h = 0.4
+    candidates = []
+    for idx, pos in enumerate(base[0].positions):
+        if np.matmul(pos,ilat)[2] > crt_h:
+            if types[idx] == 'X':
+                candidates.append(idx)
+
+    if len(candidates) > 0 :
+        S = np.random.randint(0,len(candidates))
+        ### cutoff setting
+        cut = [1.]*len(base[0].positions)
+        nei =  neighborlist.NeighborList(cut, self_interaction=False,bothways=True)
+        nei.update(base[0])
+        nei_idx = nei.get_neighbors(candidates[S])[0]
+        vec = np.array([0,0,0])
+        for idx, i in enumerate(nei_idx):
+            vec = vec + get_closePOS(lat, base[0].positions[candidates[S]], base[0].positions[i])-base[0].positions[candidates[S]]
+        vec = vec/np.linalg.norm(vec)#*(-1)*2.2
+        #print(vec)
+
+        # insert molecule
+        mol = ase.io.read('./molecules/POSCAR_'+mol_name,index=':',format='vasp')
+        mol[0].positions = mol[0].positions - np.mean(mol[0].positions,axis=0)
+        ### how to set universal molecule axis??
+        mol_axis = mol[0].positions[1] - mol[0].positions[0]
+        theta = vec_ang(vec, mol_axis)
+        rot_axis = np.cross(vec, mol_axis)
+        ### theta, coordinates sign...
+        mol[0].positions = (-1)*rot_coords(mol[0].positions, -theta, rot_axis)
+
+        types = mol[0].get_chemical_symbols()
+        for idx, e in enumerate(types):
+            if idx != 1:
+             base[0].append(e)
+             base[0].positions[-1] = mol[0].positions[idx] + base[0].positions[candidates[S]] + vec*(-1)*2.2
+        types = list(set(base[0].get_chemical_symbols()))
+
+    else:
+        print('There is no atom near the surface to satisfy the conidtion. Stop the program.')
+        sys.exit()
+
+    return base
 
 ##########################
 if __name__ == "__main__":
