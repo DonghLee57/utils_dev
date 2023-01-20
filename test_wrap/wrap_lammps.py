@@ -7,34 +7,23 @@ import ase.io
 from ase import Atoms
 
 def main():
+    input_str = sys.argv[1]
+    str4lmp = sys.argv[2]
+    nnp = sys.argv[3]
+
     # For calculating energy difference, energies of the reactant, product molecules should calculated.
     mol_list = glob.glob('./molecules/*')
     mol_E = {}
     for idx, m in enumerate(mol_list):
-        mol = ase.io.read(m,index=':',format='vasp')
-        types = list(set(mol[0].get_chemical_symbols()))
-        ase.io.write(str4lmp, images=mol, format='lammps-data')
-        write_lmp_script(str4lmp,nnp,types)
+        mol_E[m.split('_')[-1]] = get_lmp_E(m,nnp)
 
-        lmp = lammps.lammps()
-        lmp.file('py_script.in')
-        mol_E[m.split('_')[-1]] = get_lmp_log('energy')
-        lmp.close()
-
-    input_str = sys.argv[1]
-    str4lmp = sys.argv[2]
-    nnp = sys.argv[3]
+    base = ase.io.read(input_str,index=':',format='vasp')
+    E_old= get_lmp_E(input_str, nnp)
     
-    info = readPOSCAR(input_str)
-    poscar = ase.io.read(input_str,index=':',format='vasp')
-
-    ase.io.write(str4lmp, images=poscar, format='lammps-data')
-    write_lmp_script(str4lmp,nnp,info[1])
-
-    lmp = lammps.lammps()
-    lmp.file('py_script.in')
-    E0 = get_lmp_log('energy')
-    lmp.close()
+    # Scan the active sites for precursors or reactants
+    # Insert the molecule as the product form and calculate the energy difference
+    # Insert algorithm !!!
+    
 
 def write_lmp_script(str_name, pot_name, elements):
     periodic_table = [
@@ -78,7 +67,6 @@ def write_lmp_script(str_name, pot_name, elements):
     o.write(header)
     return 1
 
-
 def get_lmp_log(prop):
     o=enumerate(open('log.lammps'))
     for idx, line in o:
@@ -87,6 +75,17 @@ def get_lmp_log(prop):
             if tmp[0] =='Step':
                 step, T, PE = list(map(float,next(o)[-1].split()[:3]))
     if prop.lower() == 'energy': return PE
+
+def get_lmp_E(poscar, nnp, str4lmp='str.dat'):
+    pos = ase.io.read(poscar,index=':',format='vasp')
+    types = list(set(pos[0].get_chemical_symbols()))
+    ase.io.write(str4lmp, images=pos, format='lammps-data')
+    write_lmp_script(str4lmp,nnp,types)
+    lmp = lammps.lammps()
+    lmp.file('py_script.in')
+    E = get_lmp_log('energy')
+    lmp.close()
+    return E
 
 ##########################
 if __name__ == "__main__":
