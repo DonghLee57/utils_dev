@@ -1,3 +1,4 @@
+# LOG from SIMPLE_NN v2.0.0
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
