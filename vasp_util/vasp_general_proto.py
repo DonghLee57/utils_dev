@@ -136,6 +136,8 @@ def readOUTCAR(filename):
     out_info={'E':[],\
               'lat':np.zeros((3,3)),\
               'ntypes':None,\
+              'positions':{},\
+              'F':{},\
               'NIONS':0}
     o = enumerate(open(filename,'r'))
     for idx, line in o:
@@ -152,6 +154,14 @@ def readOUTCAR(filename):
             elif 'ENERGIE' in tmp:
                 next(o)
                 out_info['E'].append(float(next(o)[1].split()[-2]))
+            elif 'TOTAL-FORCE' in tmp:
+                next(o)
+                out_info['positions'][len(out_info['F'])] = np.empty((out_info['NIONS'],3))
+                out_info['F'][len(out_info['F'])] = np.empty((out_info['NIONS'],3))
+                for n in range(out_info['NIONS']):
+                    line = list(map(float,next(o)[-1].split()))
+                    out_info['positions'][len(out_info['positions'])-1][n] = line[:3]
+                    out_info['F'][len(out_info['F'])-1][n] = line[3:]
     return out_info
     
 def fit_density(target_rho, lat, types, atoms):
