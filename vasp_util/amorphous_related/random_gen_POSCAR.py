@@ -8,19 +8,35 @@ from ase.constraints import FixAtoms
 from ase.data import atomic_numbers, atomic_names, atomic_masses
 
 def main():
-    base = ase.io.read(sys.argv[1],format='vasp')
-    print(f'Density(input): {get_density(base):.2f} g/cm3')
-    rho = get_density(base)
-    types = ['Si']
-    atoms = [100]
-    symbols = []
-    for i in range(len(types)):
-        for j in range(atoms[i]):
-            symbols+=[types[i]]
+    # 0: generate from scratch
+    # 1: insert based on an input structure
+    flag = 1
     r_crt = 1.5
-    amor = randomPOSCAR(rho, symbols, atoms, r_crt)
+    
+    base = ase.io.read(sys.argv[1],format='vasp')
+    print(f'Density(input): {get_density(base):.6f} g/cm3')
+    rho = get_density(base)
+    if flag == 0:
+        # Generate a random structure from scratch
+        types = ['Si']
+        atoms = [100]
+        symbols = []
+        for i in range(len(types)):
+            for j in range(atoms[i]):
+                symbols+=[types[i]]
+        amor = randomPOSCAR(rho, symbols, atoms, r_crt)
+    
+    elif flag == 1:
+        # Insert random-position atoms based on a given structure
+        types = ['H']
+        atoms = [10]
+        symbols = base.get_chemical_symbols()
+        for i in range(len(types)):
+            for j in range(atoms[i]):
+                symbols+=[types[i]]
+        amor = insertPOSCAR(base, rho, symbols, atoms, r_crt)
+        
     ase.io.write('POSCAR_generated.vasp',images=amor,format='vasp')
-    return 1
 
 #--------------------------------------------------------------------------------------
 
@@ -60,6 +76,29 @@ def randomPOSCAR(rho,symbols,atoms,r_crt):
                 else: break
     genPOSCAR.set_constraint(FixAtoms(mask=constraint))
     return genPOSCAR
+
+def insertPOSCAR(base,rho,symbols,atoms,r_crt):
+    IterMAX = 1000
+    Na = 6.022E+23
+    TOT_MASS = 0
+    for i in symbols:
+        TOT_MASS += atomic_masses[atomic_numbers[i]]
+    lat = (TOT_MASS/rho/Na*10**24)**(1./3.)
+    lattice = np.zeros((3,3))
+    for i in range(3): lattice[i][i] = lat
+    base.cell = lattice
+    for i in range(sum(atoms)):
+        trials = 0
+        while True and IterMAX > trials:
+             trials += 1
+             base.append(symbols[-sum(atoms)+i])
+             base.positions[-1] = np.matmul(np.random.random(3),base.cell)
+             min_dist = min(base.get_distances(-1, indices=list(range(len(base.positions)-1)),mic=True))
+             if r_crt > min_dist:
+                 del base[-1]
+             else: break
+    return base
+
 #--------------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
