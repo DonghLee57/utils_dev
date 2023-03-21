@@ -1,8 +1,9 @@
+# python3.x
 import sys, os
 import numpy as np
 
 XDAT = open(sys.argv[1] , 'r').readlines()
-NA   = np.sum(np.array(XDAT[6].replace('\n','').strip().split()).astype(np.int))
+NA   = np.sum(np.array(list(map(int,XDAT[6].split()))))
 frame = int(sys.argv[3])
 
 header = ''
