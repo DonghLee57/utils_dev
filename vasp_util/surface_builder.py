@@ -28,8 +28,8 @@ args = parser.parse_args()
 
 h,k,l = list(map(int,args.index.split()))
 
-poscar = ase.io.read(args.infile,index=':',format='vasp')
-surf = ase.build.surface(poscar[0], (h,k,l), args.n, vacuum = args.v)
+poscar = ase.io.read(args.infile,format='vasp')
+surf = ase.build.surface(poscar, (h,k,l), args.n, vacuum = args.v)
 surf = surf[surf.numbers.argsort()]
 if not args.a:
     minZ = np.min(surf.positions[:,2])
