@@ -11,14 +11,14 @@ test_out = 'POSCAR_out'
 #
 # Case 1 - Automatic broadcast in ASE
 #
-structure = ase.io.read(test_in,index=':',format='vasp')
+structure = ase.io.read(test_in,format='vasp')
 ase.io.write(test_out,images=structure,format='vasp')
 
 
 # Case 2 - Manual parallelization
 # parallel = True or False
 if rank==0:
-  structure = ase.io.read(test_in,index=':',format='vasp',parallel=False)
+  structure = ase.io.read(test_in,format='vasp',parallel=False)
   ase.io.write(test_out,images=structure,format='vasp',parallel=False)
 else:
   pass
