@@ -2,7 +2,7 @@ import ase
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
-rsize= comm.Get_size()
+size= comm.Get_size()
 
 test_in  = 'POSCAR_in'
 test_out = 'POSCAR_out'
