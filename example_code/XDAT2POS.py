@@ -1,4 +1,4 @@
-# python 3.x
+# python3.X
 import sys
 import ase.io
 
