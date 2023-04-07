@@ -8,8 +8,11 @@ if len(sys.argv[2:]) > 1:
     if end == -1: 
         end = len(XDAT)
     for i in range(start+1,end+1,step):
-        ase.io.write(f'POSCAR_{i}',images=XDAT[i-1],format='vasp')
+        # start : 0 
+        # end : max_image - 1
+        ase.io.write(f'POSCAR_{i-1}',images=XDAT[i-1],format='vasp')
        
 elif len(sys.argv[2:]) == 1:
+    # fr : 1 ~ max_image
     fr = int(sys.argv[2])
-    ase.io.write(f'POSCAR_{fr}',images=XDAT[fr-1],format='vasp')
+    ase.io.write(f'POSCAR_{fr-1}',images=XDAT[fr-1],format='vasp')
