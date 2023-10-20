@@ -38,23 +38,21 @@ def passivation(Obj,ele='H'):
     for idx, item in enumerate(Obj.positions):
         vec = Obj.get_distances(idx, all_idx, mic=True,vector=True)
         dist = np.linalg.norm(vec,axis=1)
-        CN = np.where(dist <Rc)[0]
-        if len(CN) < 5:
-            CN = CN[np.where(CN!=idx)[0]]
-            outer = CN.copy()
-            if len(outer) ==2:
-                for pdx, pos in enumerate(vec[outer]):
+        IDs = np.where(dist <Rc)[0]
+        IDs = IDs[np.where(IDs != idx)[0]]
+        CN = len(IDs)
+        if CN < 4:
+            if CN == 2:
+                for pdx, pos in enumerate(vec[IDs]):
                     passive.append(ele)
-                    #passive.positions[-1] = item + rot_coords(pos*RH/Rc, -np.pi/2, -np.sum(Obj.positions[outer],axis=0), item)
-                    # Should be FIXED!!!
-                    passive.positions[-1] = item - rot_coords(pos*RH/Rc, 0, -np.sum(Obj.positions[outer],axis=0), item)
-            elif len(outer) ==3:
+                    passive.positions[-1] = item - rot_coords(pos*RH/Rc, np.pi/2, -np.sum(vec[IDs],axis=0))
+            elif CN == 3:
                 p_vec = np.zeros(3)
-                for pdx, pos in enumerate(vec[outer]):
+                for pdx, pos in enumerate(vec[IDs]):
                     p_vec += pos*RH/Rc
                 passive.append(ele)
                 passive.positions[-1] = item - p_vec
-            elif len(outer) ==1:
+            elif CN == 1:
                 print('Si has one Si-Si bond!!!')
                 return 0
     del passive[0]
@@ -62,18 +60,14 @@ def passivation(Obj,ele='H'):
     TOT = TOT[TOT.numbers.argsort()]
     return TOT
 
-# Should be FIXED!!!
-def rot_coords(coords, theta, axis, CENTER=[]):
+def rot_coords(coords, theta, axis):
     # theta: radian
     # axis: arbitarary axis to rotate
     ux, uy, uz = axis/np.linalg.norm(axis)
     R = np.array([[np.cos(theta)+ux**2*(1-np.cos(theta)),       ux*uy*(1-np.cos(theta))-uz*np.sin(theta),    ux*uz*(1-np.cos(theta))+uy*np.sin(theta)],\
                   [uy*ux*(1-np.cos(theta))+uz*np.sin(theta),    np.cos(theta)+uy**2*(1-np.cos(theta)),       uy*uz*(1-np.cos(theta))-ux*np.sin(theta)],\
                   [uz*ux*(1-np.cos(theta))-uy*np.sin(theta),    uz*uy*(1-np.cos(theta))+ux*np.sin(theta),    np.cos(theta)+uz**2*(1-np.cos(theta))]])
-    if len(CENTER) != 0:
-        return np.matmul(coords-CENTER,R) + CENTER
-    else:
-        return np.matmul(coords,R)
+    return np.matmul(coords,R)
 #--------------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
