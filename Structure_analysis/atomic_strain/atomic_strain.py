@@ -4,9 +4,25 @@ from ase.io import read
 # For building a neighbor list
 Rc  = 2.5
 
+def match_order(REF, NEW):
+    if REF.get_global_number_of_atoms() == NEW.get_global_number_of_atoms():
+        NIONS = REF.get_global_number_of_atoms()
+    else:
+        print("!!! The size of two systems are different. !!!")
+        return 1
+    scaled_REF = REF.get_scaled_positions()
+    scaled_NEW = NEW.get_scaled_positions()
+    order = []
+    for i in range(NIONS):
+        order.append(np.argmin(np.linalg.norm(scaled_NEW - scaled_REF[i],axis=1)))
+    order = np.array(order)
+    NEW = NEW[order]
+    return NEW
+
 REF = read(sys.argv[1],format='vasp')
 NEW = read(sys.argv[2],format='vasp')
 NIONS = REF.get_global_number_of_atoms()
+REF = match_order(NEW, REF)
 
 All_E = np.empty((NIONS, 3, 3))
 for idx in range(NIONS):
@@ -31,3 +47,9 @@ for idx in range(NIONS):
     J = np.matmul(np.linalg.inv(V),W)
     E = 0.5*(np.matmul(J,J.T)-np.eye(3))
     All_E[idx] = E
+
+# OUTPUT: xyz format with strain
+NEW.new_array('eps_xx', All_E[:,0,0],dtype=np.float64)
+NEW.new_array('eps_yy', All_E[:,1,1],dtype=np.float64)
+NEW.new_array('eps_zz', All_E[:,2,2],dtype=np.float64)
+write('Analysis.xyz', NEW, format='extxyz')
