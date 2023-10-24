@@ -14,9 +14,16 @@ def match_order(REF, NEW):
     scaled_NEW = NEW.get_scaled_positions()
     order = []
     for i in range(NIONS):
+        for x in range(-1,2):
+            for y in range(-1,2):
+                for z in range(-1,2):
+                    trans_vec = np.array([x,y,z])
+                    dist = np.linalg.norm(scaled_NEW - (scaled_REF[i]+trans_vec),axis=1)
+                    if np.fabs(np.min(dist)) < 0.01:
+                        DIST = dist.copy()
+        #print(f"{i:<4d} {np.fabs(np.min(DIST)):.4f} {np.min(DIST):.4f}")
         order.append(np.argmin(np.linalg.norm(scaled_NEW - scaled_REF[i],axis=1)))
-    order = np.array(order)
-    NEW = NEW[order]
+    NEW = NEW[np.array(order)]
     return NEW
 
 REF = read(sys.argv[1],format='vasp')
