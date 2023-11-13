@@ -2,7 +2,7 @@
 import argparse
 import sys
 import numpy as np
-import ase.io
+from ase.io import read, write
 import ase.build
 
 def flag_align(arg):
@@ -28,13 +28,15 @@ args = parser.parse_args()
 
 h,k,l = list(map(int,args.index.split()))
 
-poscar = ase.io.read(args.infile,format='vasp')
+poscar = read(args.infile,format='vasp')
 surf = ase.build.surface(poscar, (h,k,l), args.n, vacuum = args.v)
 surf = surf[surf.numbers.argsort()]
 if not args.a:
     minZ = np.min(surf.positions[:,2])
-    t_vec = []
-    for i in range(len(surf.positions)):
-        t_vec.append([0,0,-minZ])
+    t_vec = [0,0,-minZ]
     surf.translate(t_vec)
-ase.io.write(args.outfile, images=surf, format='vasp')
+else:
+    maxZ = np.max(surf.positions[:,2])
+    t_vec = [0,0,(surf.cell[2][2]-maxZ)]
+    surf.translate(t_vec)
+write(args.outfile, images=surf, format='vasp')
