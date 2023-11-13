@@ -19,7 +19,7 @@ def flip(unit):
     return unit
 
 def mk_unit_stack(unitcell):
-    surf = ase.build.sruface(unitcell, (1,1,1), 1, vacuum = 7.5)
+    surf = ase.build.surface(unitcell, (1,1,1), 1, vacuum = 7.5)
     surf = surf[surf.numbers.argsort()]
     minZ = np.min(surf.positions[:,2])
     surf.translate([0,0,-minZ])
