@@ -25,7 +25,7 @@ def mk_unit_stack(lat_a, lat_c):
     lat = np.block([[lat_A,np.zeros((2,1))],
                     [np.zeros((1,2)),lat_c]])
     for n in range(8):
-        if n == 0: stack = Atoms('Si')
+        if n == 0: stack = Atoms('Si', pbc=[1, 1, 1])
         else:      stack.append('Si')
     stack.cell = lat
     stack.positions[:4] = np.array([[0.0, 0.0, 0],
