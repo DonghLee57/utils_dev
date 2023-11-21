@@ -9,8 +9,14 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 ### Pre-defined parameters
+# RDF-related parameter
 r_max= 6
 dr = 0.01
+# ADF-related parameter
+angle_lim = [0, 180]
+dangle=1.0
+# plotting style
+fs=12
 
 ###
 def main():
@@ -21,6 +27,7 @@ def main():
         types = list(set(symbols))
         RDF = get_rdf(tmp)
         PRDF = get_prdf(tmp, types)
+        ADF = get_adf(tmp, ["B","A","A"], [r1, r2], angle_lim=angle_lim):
         
     # For temporal averaging
     if False:
@@ -46,6 +53,7 @@ def main():
     if False:
         plot_rdf(RDF)
         plot_prdf(PRDF)
+        plot_adf(ADF, triplet_label='A-B-A')
 
 ###
 def get_rdf(Obj):
@@ -72,16 +80,16 @@ def plot_rdf(RDF):
     ax.plot(RDF[0], RDF[1])
     print(f"Peak height: {np.max(RDF[1]):.2f}")
     print(f"Peak position: {RDF[0][np.argmax(RDF[1])]:.2f}")
-    ax.set_xlabel(r'Distance ($\mathrm{\AA}$)',fontsize=12)
-    ax.set_ylabel('g(r)',fontsize=12)
+    ax.set_xlabel(r'Distance ($\mathrm{\AA}$)',fontsize=fs)
+    ax.set_ylabel('g(r)',fontsize=fs)
     ax.set_xlim([0,r_max])
     ax.set_ylim(bottom=0)
     plt.savefig('Total_RDF.png')
     return 0
 
 def get_prdf(Obj, types, targets=None):
-    # targets: ("element1", "element2")
-    # ex) ("Si", "O")
+    # targets: ["element1", "element2"]
+    # ex) ["Si", "O"]
     bins = np.arange(dr/2, r_max, dr)
     volume = np.fabs(np.linalg.det(Obj.cell))
     if targets == None:
@@ -90,7 +98,7 @@ def get_prdf(Obj, types, targets=None):
             for idx, i in enumerate(types):
                 for jdx, j in enumerate(types):
                     if idx <= jdx:
-                        combinations.append((i,j))
+                        combinations.append([i,j])
             fig,ax = plt.subplots()
         else:
             combinations = None
@@ -126,13 +134,67 @@ def plot_prdf(PRDF):
         print(f"{pair}")
         print(f"Peak height: {np.max(PRDF[1][pair]):.2f}")
         print(f"Peak position: {PRDF[0][np.argmax(PRDF[1][pair])]:.2f}")
-    ax.set_xlabel(r'Distance ($\mathrm{\AA}$)',fontsize=12)
-    ax.set_ylabel('g(r)',fontsize=12)
+    ax.set_xlabel(r'Distance ($\mathrm{\AA}$)',fontsize=fs)
+    ax.set_ylabel('g(r)',fontsize=fs)
     ax.set_xlim([0,r_max])
     ax.set_ylim(bottom=0)
     ax.legend()
     plt.savefig('Partial_RDF.png')
     return 0
+    
+def get_adf(Obj, targets, cutoff, angle_lim=[0, 180], expr='degree'):
+    # To facilitate a clear bond angle analysis, the target triplet with cutoff distances should be provided.
+    # targets: ["Center", "Neighbor_1", "Neighbor_2"]
+    # ex) ["Si", "Si", "O"]
+    # cutoff: [r_1, r_2]
+    # ex) [2.6, 2.0]
+    bins = np.arange(angle_lim[0], angle_lim[1]+0.001, dangle)
+    if expr != 'degree': bins = bins*np.pi/180
+    symbols = np.array(tmp.get_chemical_symbols())
+    cidx = np.where( targets[0] == symbols )[0]
+    nidx = np.where( targets[1] == symbols )[0]
+    midx = np.where( targets[2] == symbols )[0]
+    theta = []
+    psize = len(cidx)//size
+    if rank == size-1:
+        for c in range(rank*psize,len(cidx)):
+            for n in range(len(nidx):
+                vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                dist1 = np.linalg.norm(vec)
+                if dist1 < cutoff[0]:
+                    for m in range(len(midx)):
+                        vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                        dist2 = np.linalg.norm(vec)
+                        if dist2 < cutoff[1]:
+                            theta.append(np.arccos(np.dot(vec1, vec2)/dist1/dist2))
+    else:
+        for c in range(rank*psize,(rank+1)*psize):
+            for n in range(len(nidx):
+                vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                dist1 = np.linalg.norm(vec)
+                if dist1 < cutoff[0]:
+                    for m in range(len(midx)):
+                        vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                        dist2 = np.linalg.norm(vec)
+                        if dist2 < cutoff[1]:
+                            theta.append(np.arccos(np.dot(vec1, vec2)/dist1/dist2))
+    theta = comm.reduce(theta,op=MPI.SUM,root=0)
+    theta = comm.bcast(theta, root=0)
+    res = np.histogram(theta,bins=bins)
+    if expr != 'degree': return res[1][:-1], res[0]
+    else:                return res[1][:-1], res[0]/np.pi*180
+    
+ def plot_adf(ADF, expr='degree', triplet_label=''):
+    fig,ax = plt.subplots()
+    if triplet_label != '': fig.suptitle(triplet_label, fontsize=fs*1.5)
+    ax.plot(ADF[0], ADF[1])
+    if expr != 'degree': ax.set_xlabel(r'Bond angle (rad)',fontsize=fs)
+    else:                ax.set_xlabel(r'Bond angle ($^\circ$)',fontsize=fs)
+    ax.set_ylabel('Counts', fontsize=fs)
+    ax.set_xlim([ADF[0][0], ADF[0][-1]])
+    ax.set_ylim(bottom=0)
+    plt.savefig(f'ADF_{triplet_label}.png')
+    return 0 
 
 ###
 if __name__ == "__main__":
