@@ -1,4 +1,4 @@
-import sys
+import sys, os
 import numpy as np
 from ase import Atoms
 from ase.io import read
@@ -10,8 +10,10 @@ rank = comm.Get_rank()
 
 ### Pre-defined parameters
 # RDF-related parameter
-r_max= 6
+r_max= 3
 dr = 0.01
+RDF_FILE = 'rdf.out'
+PRDF_FILE = 'prdf.out'
 # ADF-related parameter
 angle_lim = [0, 180]
 dangle=1.0
@@ -22,12 +24,12 @@ fs=12
 def main():
     # For a single image
     if True:
-        tmp = read("POSCAR", format="vasp")
+        tmp = read(sys.argv[1], format="vasp")
         symbols = np.array(tmp.get_chemical_symbols())
         types = list(set(symbols))
-        RDF = get_rdf(tmp)
-        PRDF = get_prdf(tmp, types)
-        ADF = get_adf(tmp, ["B","A","A"], [r1, r2], angle_lim=angle_lim):
+        #RDF = get_rdf(tmp, savefile=RDF_FILE)
+        #PRDF = get_prdf(tmp, types, savefile=PRDF_FILE)
+        ADF = get_adf(tmp, ["Si","O","O"], [1.6, 1.6], angle_lim=angle_lim)
         
     # For temporal averaging
     if False:
@@ -50,13 +52,14 @@ def main():
         for idx, pair in enumerate(comb): PRDF[1][pair] /= nimg
         
     # Plotting data
-    if False:
-        plot_rdf(RDF)
-        plot_prdf(PRDF)
-        plot_adf(ADF, triplet_label='A-B-A')
+    if True and rank == 0:
+        #if os.path.isfile(RDF_FILE): RDF = np.loadtxt(RDF_FILE)
+        #plot_rdf(RDF)
+        #plot_prdf(PRDF)
+        plot_adf(ADF, triplet_label='O-Si-O')
 
 ###
-def get_rdf(Obj):
+def get_rdf(Obj, savefile='rdf.out'):
     bins = np.arange(dr/2, r_max, dr)
     positions = Obj.positions
     volume = np.fabs(np.linalg.det(Obj.cell))
@@ -73,9 +76,10 @@ def get_rdf(Obj):
     dist = comm.bcast(dist, root=0)
     res = np.histogram(dist,bins=bins)
     rdf = volume*res[0]/(NIONS**2*4*np.pi*res[1][:-1]**2*dr)
+    if rank == 0: np.savetxt(savefile, [res[1][:-1], rdf], fmt='%.4f')
     return res[1][:-1], rdf
 
-def plot_rdf(RDF):
+def plot_rdf(RDF, savefile='Total_RDF.png'):
     fig,ax = plt.subplots()
     ax.plot(RDF[0], RDF[1])
     print(f"Peak height: {np.max(RDF[1]):.2f}")
@@ -84,13 +88,14 @@ def plot_rdf(RDF):
     ax.set_ylabel('g(r)',fontsize=fs)
     ax.set_xlim([0,r_max])
     ax.set_ylim(bottom=0)
-    plt.savefig('Total_RDF.png')
+    plt.savefig(savefile)
     return 0
 
-def get_prdf(Obj, types, targets=None):
+def get_prdf(Obj, types, targets=None, savefile='prdf.out'):
     # targets: ["element1", "element2"]
     # ex) ["Si", "O"]
     bins = np.arange(dr/2, r_max, dr)
+    symbols = np.array(Obj.get_chemical_symbols())
     volume = np.fabs(np.linalg.det(Obj.cell))
     if targets == None:
         if rank == 0:
@@ -104,26 +109,28 @@ def get_prdf(Obj, types, targets=None):
             combinations = None
         combinations = comm.bcast(combinations, root=0)
     else:
-        combinations = [targets]       
+        combinations = [targets]
     prdf = {}
     for pidx, pair in enumerate(combinations):
         i = np.where(symbols == pair[0])[0]
         j = np.where(symbols == pair[1])[0]
-        for idx in range(nimg):
-            positions = Obj.positions
-            dist = np.zeros((len(i),len(j)))
-            psize = len(i)//size
-            if rank == size-1:
-                for a in range(rank*psize,len(i)):
-                    dist[a] = Obj.get_distances(i[a],j,mic=True)
-            else:
-                for a in range(rank*psize,(rank+1)*psize):
-                    dist[a] = Obj.get_distances(i[a],j,mic=True)
-            dist = comm.reduce(dist,op=MPI.SUM,root=0)
-            dist = comm.bcast(dist, root=0)
-            res = np.histogram(dist,bins=bins)
-            rdf = volume*res[0]/(len(i)*len(j)*4*np.pi*res[1][:-1]**2*dr)
-            prdf[pair] = rdf.copy()
+        positions = Obj.positions
+        dist = np.zeros((len(i),len(j)))
+        psize = len(i)//size
+        if rank == size-1:
+            for a in range(rank*psize,len(i)):
+                dist[a] = Obj.get_distances(i[a],j,mic=True)
+        else:
+            for a in range(rank*psize,(rank+1)*psize):
+                dist[a] = Obj.get_distances(i[a],j,mic=True)
+        dist = comm.reduce(dist,op=MPI.SUM,root=0)
+        dist = comm.bcast(dist, root=0)
+        res = np.histogram(dist,bins=bins)
+        rdf = volume*res[0]/(len(i)*len(j)*4*np.pi*res[1][:-1]**2*dr)
+        key = f'{pair[0]}-{pair[1]}'
+        prdf[key] = rdf.copy()
+        if rank == 0:
+            np.savetxt(key+'_'+savefile, [res[1][:-1], prdf[key]], fmt='%.4f')
     return res[1][:-1], prdf
 
 def plot_prdf(PRDF):
@@ -150,41 +157,70 @@ def get_adf(Obj, targets, cutoff, angle_lim=[0, 180], expr='degree'):
     # ex) [2.6, 2.0]
     bins = np.arange(angle_lim[0], angle_lim[1]+0.001, dangle)
     if expr != 'degree': bins = bins*np.pi/180
-    symbols = np.array(tmp.get_chemical_symbols())
+    symbols = np.array(Obj.get_chemical_symbols())
     cidx = np.where( targets[0] == symbols )[0]
     nidx = np.where( targets[1] == symbols )[0]
     midx = np.where( targets[2] == symbols )[0]
     theta = []
     psize = len(cidx)//size
-    if rank == size-1:
-        for c in range(rank*psize,len(cidx)):
-            for n in range(len(nidx):
-                vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
-                dist1 = np.linalg.norm(vec)
-                if dist1 < cutoff[0]:
-                    for m in range(len(midx)):
-                        vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
-                        dist2 = np.linalg.norm(vec)
-                        if dist2 < cutoff[1]:
-                            theta.append(np.arccos(np.dot(vec1, vec2)/dist1/dist2))
+    if targets[1] == targets[2]:
+        if rank == size-1:
+            for c in range(rank*psize,len(cidx)):
+                for n in range(len(nidx)):
+                    vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                    dist1 = np.linalg.norm(vec1)
+                    if dist1 < cutoff[0]:
+                        for m in range(len(midx)):
+                            if m > n:
+                                vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                dist2 = np.linalg.norm(vec2)
+                                if dist2 < cutoff[1]:
+                                    theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+        else:
+            for c in range(rank*psize,(rank+1)*psize):
+                for n in range(len(nidx)):
+                    vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                    dist1 = np.linalg.norm(vec1)
+                    if dist1 < cutoff[0]:
+                        for m in range(len(midx)):
+                            if m > n:
+                                vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                dist2 = np.linalg.norm(vec2)
+                                if dist2 < cutoff[1]:
+                                    theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
     else:
-        for c in range(rank*psize,(rank+1)*psize):
-            for n in range(len(nidx):
-                vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
-                dist1 = np.linalg.norm(vec)
-                if dist1 < cutoff[0]:
-                    for m in range(len(midx)):
-                        vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
-                        dist2 = np.linalg.norm(vec)
-                        if dist2 < cutoff[1]:
-                            theta.append(np.arccos(np.dot(vec1, vec2)/dist1/dist2))
+        if rank == size-1:
+            for c in range(rank*psize,len(cidx)):
+                for n in range(len(nidx)):
+                    vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                    dist1 = np.linalg.norm(vec1)
+                    if dist1 < cutoff[0]:
+                        for m in range(len(midx)):
+                            if m != n:
+                                vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                dist2 = np.linalg.norm(vec2)
+                                if dist2 < cutoff[1]:
+                                    theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+        else:
+            for c in range(rank*psize,(rank+1)*psize):
+                for n in range(len(nidx)):
+                    vec1 = Obj.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                    dist1 = np.linalg.norm(vec1)
+                    if dist1 < cutoff[0]:
+                        for m in range(len(midx)):
+                            if m != n:
+                                vec2 = Obj.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                dist2 = np.linalg.norm(vec2)
+                                if dist2 < cutoff[1]:
+                                    theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+
     theta = comm.reduce(theta,op=MPI.SUM,root=0)
     theta = comm.bcast(theta, root=0)
+    if expr == 'degree': theta = np.array(theta)*180/np.pi
     res = np.histogram(theta,bins=bins)
-    if expr != 'degree': return res[1][:-1], res[0]
-    else:                return res[1][:-1], res[0]/np.pi*180
+    return res[1][:-1], res[0]
     
- def plot_adf(ADF, expr='degree', triplet_label=''):
+def plot_adf(ADF, expr='degree', triplet_label=''):
     fig,ax = plt.subplots()
     if triplet_label != '': fig.suptitle(triplet_label, fontsize=fs*1.5)
     ax.plot(ADF[0], ADF[1])
