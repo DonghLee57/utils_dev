@@ -15,8 +15,10 @@ dr = 0.01
 RDF_FILE = 'rdf.out'
 PRDF_FILE = 'prdf.out'
 # ADF-related parameter
-angle_lim = [0, 180]
-dangle=1.0
+triplet    =  ["Si","O","O"]  #["Center", "Neighbor_1", "Neighbor_2"]
+rc4angle   =  [1.6 , 1.6]     # Pair of bond lengths for calculating angle
+angle_lim  =  [0, 180]        # Minimum and maximum of bin
+dangle     =  1.0             # bin size in histgram
 # plotting style
 fs=12
 
@@ -29,34 +31,47 @@ def main():
         types = list(set(symbols))
         #RDF = get_rdf(tmp, savefile=RDF_FILE)
         #PRDF = get_prdf(tmp, types, savefile=PRDF_FILE)
-        ADF = get_adf(tmp, ["Si","O","O"], [1.6, 1.6], angle_lim=angle_lim)
+        ADF = get_adf(tmp, triplet, rc4angle, angle_lim=angle_lim)
         
     # For temporal averaging
     if False:
         tmp = read("XDATCAR", index=slice(start,end,step), format="vasp-xdatcar")
         nimg = len(tmp)
-        RDF = None
-        #PRDF = None
-        for idx, img in enumerate(tmp):
-            symbols = np.array(img.get_chemical_symbols())
-            types = list(set(symbols))
-            if True:
-                if RDF == None: RDF = get_rdf(img)
-                else:           RDF[1] += get_rdf(img)[1]            
-            if True:
+        if False:
+            RDF = None
+            for idx, img in enumerate(tmp):
+                symbols = np.array(img.get_chemical_symbols())
+                types = list(set(symbols))
+                if RDF == None: RDF     = get_rdf(img)
+                else:           RDF[1] += get_rdf(img)[1]
+            RDF[1] /= nimg
+        if False:
+            PRDF = None
+            for idx, img in enumerate(tmp):
+                symbols = np.array(img.get_chemical_symbols())
+                types = list(set(symbols))
                 if PRDF == None: PRDF = get_prdf(img, types)
                 else:
                     comb = PRDF[1].keys()
                     for idx, pair in enumerate(comb):
                         PRDF[1][pair] += get_prdf(img, types)[1][pair]
-        for idx, pair in enumerate(comb): PRDF[1][pair] /= nimg
+            for idx, pair in enumerate(comb):
+                PRDF[1][pair] /= nimg
+        if False:
+            ADF = None
+            for idx, img in enumerate(tmp):
+                symbols = np.array(img.get_chemical_symbols())
+                types = list(set(symbols))
+                if ADF == None:  ADF     = get_adf(img, triplet, rc4angle, angle_lim=angle_lim)
+                else:            ADF[1] += get_adf(img, triplet, rc4angle, angle_lim=angle_lim)
+            ADF /= nimg
         
     # Plotting data
     if True and rank == 0:
         #if os.path.isfile(RDF_FILE): RDF = np.loadtxt(RDF_FILE)
         #plot_rdf(RDF)
         #plot_prdf(PRDF)
-        plot_adf(ADF, triplet_label='O-Si-O')
+        plot_adf(ADF, triplet_label=f'(triplet[1])-{triplet[0]}-{triplet[2]}')
 
 ###
 def get_rdf(Obj, savefile='rdf.out'):
@@ -213,7 +228,6 @@ def get_adf(Obj, targets, cutoff, angle_lim=[0, 180], expr='degree'):
                                 dist2 = np.linalg.norm(vec2)
                                 if dist2 < cutoff[1]:
                                     theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
-
     theta = comm.reduce(theta,op=MPI.SUM,root=0)
     theta = comm.bcast(theta, root=0)
     if expr == 'degree': theta = np.array(theta)*180/np.pi
