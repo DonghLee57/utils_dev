@@ -9,6 +9,7 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 ### Pre-defined parameters
+start, end, step = 0, 50 , 1
 # RDF-related parameter
 r_max= 3
 dr = 0.01
@@ -19,13 +20,17 @@ triplet    =  ["Si","O","O"]  #["Center", "Neighbor_1", "Neighbor_2"]
 rc4angle   =  [1.6 , 1.6]     # Pair of bond lengths for calculating angle
 angle_lim  =  [0, 180]        # Minimum and maximum of bin
 dangle     =  1.0             # bin size in histgram
+# Diffusivity
+SELECT_ATOMS = np.arange(0,2)
+MSD_FILE = 'msd.out'
+
 # plotting style
 fs=12
 
 ###
 def main():
     # For a single image
-    if True:
+    if False:
         tmp = read(sys.argv[1], format="vasp")
         symbols = np.array(tmp.get_chemical_symbols())
         types = list(set(symbols))
@@ -34,8 +39,9 @@ def main():
         ADF = get_adf(tmp, triplet, rc4angle, angle_lim=angle_lim)
         
     # For temporal averaging
-    if False:
+    if True:
         tmp = read("XDATCAR", index=slice(start,end,step), format="vasp-xdatcar")
+        #tmp = read(sys.argv[1], index=slice(start,end,step), format="lammps-dump-text")
         nimg = len(tmp)
         if False:
             RDF = None
@@ -65,13 +71,21 @@ def main():
                 if ADF == None:  ADF     = get_adf(img, triplet, rc4angle, angle_lim=angle_lim)
                 else:            ADF[1] += get_adf(img, triplet, rc4angle, angle_lim=angle_lim)
             ADF /= nimg
-        
+        if True:
+            UNWRAP = unwrapping(tmp, targets=SELECT_ATOMS)
+            # One-line
+            MSD = np.sum(np.linalg.norm(UNWRAP - UNWRAP[0],axis=-1),axis=-1)/len(SELECT_ATOMS)
+            # Parallel?
+            #MSD = ??
+
     # Plotting data
     if True and rank == 0:
         #if os.path.isfile(RDF_FILE): RDF = np.loadtxt(RDF_FILE)
         #plot_rdf(RDF)
         #plot_prdf(PRDF)
-        plot_adf(ADF, triplet_label=f'(triplet[1])-{triplet[0]}-{triplet[2]}')
+        #plot_adf(ADF, triplet_label=f'(triplet[1])-{triplet[0]}-{triplet[2]}')
+        plot_msd(MSD, unit='ps')
+        pass
 
 ###
 def get_rdf(Obj, savefile='rdf.out'):
@@ -244,7 +258,48 @@ def plot_adf(ADF, expr='degree', triplet_label=''):
     ax.set_xlim([ADF[0][0], ADF[0][-1]])
     ax.set_ylim(bottom=0)
     plt.savefig(f'ADF_{triplet_label}.png')
-    return 0 
+    return 0
+
+def unwrapping(Obj, targets):
+    IMG0 = Obj[0].get_positions()[targets]
+    LAT = Obj[0].cell.copy()
+    OLD = Obj[0].get_scaled_positions()
+    UNWRAP_TRJ = np.zeros((len(Obj), len(targets), 3))
+    psize = len(targets)//size
+    if rank == size-1:
+        parts = np.arange(rank*psize,len(targets))
+        for idx in range(1, len(Obj)):
+            NEW = Obj[idx].get_scaled_positions()
+            diff = NEW[parts] - OLD[parts]
+            UNWRAP_TRJ[idx][parts] = UNWRAP_TRJ[idx-1][parts] + (np.round(-diff)+diff)@LAT 
+            OLD = Obj[idx].get_scaled_positions()
+    else:
+        parts = np.arange(rank*psize,(rank+1)*psize)
+        for idx in range(1, len(Obj)):
+            NEW = Obj[idx].get_scaled_positions()
+            diff = NEW[parts] - OLD[parts]
+            UNWRAP_TRJ[idx][parts] = UNWRAP_TRJ[idx-1][parts] + (np.round(-diff)+diff)@LAT 
+            OLD = Obj[idx].get_scaled_positions()
+    UNWRAP_TRJ = comm.reduce(UNWRAP_TRJ, op=MPI.SUM, root=0)
+    UNWRAP_TRJ = comm.bcast(UNWRAP_TRJ, root=0)
+    return UNWRAP_TRJ
+
+def plot_msd(MSD, TIMESTEP = 2, unit='fs', savefile=MSD_FILE):
+    # TIMESTEP: femtoseconds
+    fig,ax = plt.subplots()
+    if unit=='fs':
+        ax.plot(np.arange(0,len(MSD))*TIMESTEP,MSD)
+        ax.set_xlabel("Time (fs)",fontsize=fs)
+        np.savetxt(f"{unit}_"+savefile, [np.arange(0,len(MSD))*TIMESTEP, MSD], fmt='%.4f')
+    elif unit=='ps':
+        ax.plot(np.arange(0,len(MSD))*TIMESTEP/1000,MSD)
+        ax.set_xlabel("Time (ps)",fontsize=fs)
+        np.savetxt(f"{unit}_"+savefile, [np.arange(0,len(MSD))*TIMESTEP/1000,MSD], fmt='%.4f')
+    ax.set_ylabel(r"MSD ($\mathrm{\AA}^2$/fs)",fontsize=fs)
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0)
+    plt.savefig('MSD.png')
+    return 0
 
 ###
 if __name__ == "__main__":
