@@ -9,7 +9,7 @@ size = comm.Get_size()
 rank = comm.Get_rank()
 
 ### Pre-defined parameters
-start, end, step = 0, 50 , 1
+start, end, step = 0, 101 , 1
 # RDF-related parameter
 r_max= 3
 dr = 0.01
@@ -21,7 +21,8 @@ rc4angle   =  [1.6 , 1.6]     # Pair of bond lengths for calculating angle
 angle_lim  =  [0, 180]        # Minimum and maximum of bin
 dangle     =  1.0             # bin size in histgram
 # Diffusivity
-SELECT_ATOMS = np.arange(0,2)
+#SELECT_ATOMS = np.arange(512,514)
+SELECT_ELEMENTS = 'H'
 MSD_FILE = 'msd.out'
 
 # plotting style
@@ -40,8 +41,8 @@ def main():
         
     # For temporal averaging
     if True:
-        tmp = read("XDATCAR", index=slice(start,end,step), format="vasp-xdatcar")
-        #tmp = read(sys.argv[1], index=slice(start,end,step), format="lammps-dump-text")
+        #tmp = read("XDATCAR", index=slice(start,end,step), format="vasp-xdatcar")
+        tmp = read(sys.argv[1], index=slice(start,end,step), format="lammps-dump-text")
         nimg = len(tmp)
         if False:
             RDF = None
@@ -72,19 +73,19 @@ def main():
                 else:            ADF[1] += get_adf(img, triplet, rc4angle, angle_lim=angle_lim)
             ADF /= nimg
         if True:
-            UNWRAP = unwrapping(tmp, targets=SELECT_ATOMS)
+            UNWRAP = unwrapping(tmp, ELEMENTS=SELECT_ELEMENTS) # ATOMS=SELECT_ATOMS
             # One-line
-            MSD = np.sum(np.linalg.norm(UNWRAP - UNWRAP[0],axis=-1),axis=-1)/len(SELECT_ATOMS)
+#            MSD_xyz = np.sum(np.power(UNWRAP - UNWRAP[0],2),axis=1)/UNWRAP.shape[1]; print(MSD_xyz);
+            MSD = np.sum(np.sum(np.power(UNWRAP - UNWRAP[0],2),axis=1),axis=-1)/UNWRAP.shape[1]
             # Parallel?
-            #MSD = ??
-
+    
     # Plotting data
     if True and rank == 0:
         #if os.path.isfile(RDF_FILE): RDF = np.loadtxt(RDF_FILE)
         #plot_rdf(RDF)
         #plot_prdf(PRDF)
         #plot_adf(ADF, triplet_label=f'(triplet[1])-{triplet[0]}-{triplet[2]}')
-        plot_msd(MSD, unit='ps')
+        plot_msd(MSD, TIMESTEP=1000, unit='ps')
         pass
 
 ###
@@ -260,24 +261,29 @@ def plot_adf(ADF, expr='degree', triplet_label=''):
     plt.savefig(f'ADF_{triplet_label}.png')
     return 0
 
-def unwrapping(Obj, targets):
+def unwrapping(Obj, ATOMS=None, ELEMENTS=None):
+    if ELEMENTS !=  None:
+        targets = np.where( ELEMENTS == np.array(Obj[0].get_chemical_symbols()) )[0]
+    if ATOMS != None:
+        targets = ATOMS
     IMG0 = Obj[0].get_positions()[targets]
     LAT = Obj[0].cell.copy()
     OLD = Obj[0].get_scaled_positions()
     UNWRAP_TRJ = np.zeros((len(Obj), len(targets), 3))
+    UNWRAP_TRJ[0] = IMG0.copy()
     psize = len(targets)//size
     if rank == size-1:
         parts = np.arange(rank*psize,len(targets))
         for idx in range(1, len(Obj)):
             NEW = Obj[idx].get_scaled_positions()
-            diff = NEW[parts] - OLD[parts]
+            diff = NEW[targets[parts]] - OLD[targets[parts]]
             UNWRAP_TRJ[idx][parts] = UNWRAP_TRJ[idx-1][parts] + (np.round(-diff)+diff)@LAT 
             OLD = Obj[idx].get_scaled_positions()
     else:
         parts = np.arange(rank*psize,(rank+1)*psize)
         for idx in range(1, len(Obj)):
             NEW = Obj[idx].get_scaled_positions()
-            diff = NEW[parts] - OLD[parts]
+            diff = NEW[targets[parts]] - OLD[targets[parts]]
             UNWRAP_TRJ[idx][parts] = UNWRAP_TRJ[idx-1][parts] + (np.round(-diff)+diff)@LAT 
             OLD = Obj[idx].get_scaled_positions()
     UNWRAP_TRJ = comm.reduce(UNWRAP_TRJ, op=MPI.SUM, root=0)
@@ -295,7 +301,7 @@ def plot_msd(MSD, TIMESTEP = 2, unit='fs', savefile=MSD_FILE):
         ax.plot(np.arange(0,len(MSD))*TIMESTEP/1000,MSD)
         ax.set_xlabel("Time (ps)",fontsize=fs)
         np.savetxt(f"{unit}_"+savefile, [np.arange(0,len(MSD))*TIMESTEP/1000,MSD], fmt='%.4f')
-    ax.set_ylabel(r"MSD ($\mathrm{\AA}^2$/fs)",fontsize=fs)
+    ax.set_ylabel(r"MSD ($\mathrm{\AA}^2$/"+f"{unit})",fontsize=fs)
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
     plt.savefig('MSD.png')
