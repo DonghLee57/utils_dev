@@ -2,7 +2,7 @@ import sys
 import glob
 
 outcars = glob.glob('./out*')
-outcars.sort()
+outcars.sort(key=lambda x: int(x.split('_')[-1]))
 EE,P = [],[]
 for i in range(len(outcars)):
  OUT = open(outcars[i],'r')
