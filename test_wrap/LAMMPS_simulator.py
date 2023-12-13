@@ -130,7 +130,7 @@ class SIMULATOR:
       o.write('boundary\tp p p\n')
       o.write('box\t\ttilt large\n')
       o.write(f'read_data\t{FILE}\n\n')
-      o.write(self.set_pot('nn', self.POT, symbols, self.symbols))
+      o.write(set_pot(self.POT, self.pot_type, symbols, self.symbols))
       o.write(f'thermo\t\t{self.DUMPSTEP} \n')
       o.write('thermo_modify\tlost ignore flush yes\n\n')
       o.write(f'variable\t\tu uloop {NEBSTEP}\n')
@@ -173,6 +173,7 @@ def NNP_prepare(FILE, NTYPES):
 # Write the part related to potential and atom types in the LAMMPS script
 def set_pot(POT, pot_type, symbols, all_symbols):
   if pot_type == 'NNP': pot_type = 'nn'
+  #if pot_type == 'NNP': pot_type = 'nn/intel' #if SIMD compile
   lines, elements, masses, count, bins = '', '', '', 0, []
   for i, item in enumerate(symbols):
     bins.append(item[0])
