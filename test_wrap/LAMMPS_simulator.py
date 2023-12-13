@@ -41,6 +41,7 @@ class SIMULATOR:
     if self.pot_type == 'NNP':
       self.symbols = subprocess.check_output(['head',f'{self.POT}','-n','1'],universal_newlines=True).split()[1:]
       self.NTYPES = len(self.symbols)
+    self.SCRIPT = 'script.in'
 
   def by_script(self, SCRIPT):
     res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',SCRIPT],universal_newlines=True)
@@ -79,8 +80,8 @@ class SIMULATOR:
         o.write('minimize 1e-6 1e-10 10000 100000\n')
         if out == None: o.write(f'write_data\tmin_end.lammps\n')
         else:           o.write(f'write_data\tmin_end_{out}.lammps\n')
-      res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
-      with open(f'log_anneal_{T:d}.x','w') as o: o.write(res)
+    res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
+    with open(f'log_anneal_{T:d}.x','w') as o: o.write(res)
 
   def MQ(self, FILE, symbols, T_melt, T_init, T_end=300.0, Qrate=10.0, ensemble='nvt', min_init=False, min_end=False, out=None):
     if self.pot_type == 'NNP': NNP_prepare(FILE, self.NTYPES)
@@ -117,8 +118,8 @@ class SIMULATOR:
         o.write('minimize 1e-6 1e-10 10000 100000\n')
         if out == None: o.write(f'write_data\tmin_end.lammps\n')
         else:           o.write(f'write_data\tmin_end_{out}.lammps\n')
-      res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
-      with open(f'log_mq.x','w') as o: o.write(res)
+    res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
+    with open(f'log_mq.x','w') as o: o.write(res)
   
   def NEB(self, FILE, symbols, NEBSTEP):
     # Check running
@@ -141,8 +142,8 @@ class SIMULATOR:
       o.write('### quickmin fire cg sd hftn\n')
       o.write('min_style\t\tquickmin\n')
       o.write('neb\t\t0.0 0.01 100 100 10 each coords_$i.lammps\n')
-      res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
-      with open(f'log_NEB.x','w') as o: o.write(res)
+    res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
+    with open(f'log_NEB.x','w') as o: o.write(res)
         
 ###
 def C2K(T):
@@ -184,7 +185,7 @@ def set_pot(POT, pot_type, symbols, all_symbols):
       count    += 1
       elements += f' {item}'
       masses   += f'mass\t\t{count+len(symbols)} {atomic_masses[atomic_numbers[item]]}\n'
-  lines += f'pair_style  {pot_type}\npair_coeff  * * "{pot}" {elements}\n'
+  lines += f'pair_style  {pot_type}\npair_coeff  * * "{POT}" {elements}\n'
   lines += masses
   return lines
       
