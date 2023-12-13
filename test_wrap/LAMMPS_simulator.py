@@ -19,8 +19,16 @@ def main():
     write('test.lammps', images=tmp, format='lammps-data')
     
   my = SIMULATOR(POT, pot_type)
+  # def by_script(self, SCRIPT):
   #my.by_script('test.in')
-  #my.anneal()
+
+  # def ANNEAL(self, FILE, symbols, T, TIME=500, ensemble='nvt', min_init=False, min_end=False, out=None):
+  #my.ANNEAL()
+
+  # def MQ(self, FILE, symbols, T_melt, T_init, T_end=300.0, Qrate=10.0, ensemble='nvt', min_init=False, min_end=False, out=None):
+  #my.MQ()
+
+  # def NEB(self, FILE, symbols, NEBSTEP):
   #my.NEB()
 
 ###
@@ -39,7 +47,7 @@ class SIMULATOR:
     with open(f'log.x','w') as o: o.write(res)
     return 0
 
-  def ANNEAL(self, FILE, symbols, T, TIME=500, ensemble='nvt', out=None):
+  def ANNEAL(self, FILE, symbols, T, TIME=500, ensemble='nvt', min_init=False, min_end=False, out=None):
     if self.pot_type == 'NNP': NNP_prepare(FILE, self.NTYPES)
     It = int(TIME/self.TIMESTEP)
     with open(self.SCRIPT,'w') as o:
@@ -52,20 +60,65 @@ class SIMULATOR:
       o.write(set_pot(self.POT, self.pot_type, symbols, self.symbols))
       o.write(f'thermo\t\t{self.DUMPSTEP} \n')
       o.write('thermo_modify\tlost ignore flush yes\n\n')
+      if min_init:
+        o.write('fix 1 all box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
+        o.write('minimize 1e-6 1e-10 10000 100000\n')
+        if out == None: o.write(f'write_data\tmin_init.lammps\n')
+        else:           o.write(f'write_data\tmin_init_{out}.lammps\n')
       o.write(f'velocity\tall create {T} {np.random.randint(low=1,high=100)} dist gaussian\n')
       if ensemble =='nvt':   o.write(f'fix\t\tTHERMOSTAT all nvt temp {T} {T} 1\n')
       elif ensemble =='npt': o.write(f'fix\t\tTHERMOSTAT all npt temp {T} {T} 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
-      o.write(f'timestep {self.TIMESTEP:.3f}\n')
+      o.write(f'timestep {self.TIMESTEP:.4f}\n')
       o.write(f'dump\t\tDUMP all custom {self.DUMPSTEP} dump_anneal_{T:d}.lammpstrj id type x y z\n')
       o.write('dump_modify\tDUMP sort id\n\n')
       o.write(f'run\t\t{It}\n')
       o.write(f'write_data\t{T:d}.lammps\n')
-      o.write('unfix THERMOSTAT\n')
-      o.write('fix 1 all box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
-      o.write('minimize 1e-6 1e-10 10000 100000\n')
-      o.write(f'write_data\tmin_{T:d}.lammps\n')
+      if min_end:
+        o.write('unfix THERMOSTAT\n')
+        o.write('fix 1 all box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
+        o.write('minimize 1e-6 1e-10 10000 100000\n')
+        if out == None: o.write(f'write_data\tmin_end.lammps\n')
+        else:           o.write(f'write_data\tmin_end_{out}.lammps\n')
       res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
       with open(f'log_anneal_{T:d}.x','w') as o: o.write(res)
+
+  def MQ(self, FILE, symbols, T_melt, T_init, T_end=300.0, Qrate=10.0, ensemble='nvt', min_init=False, min_end=False, out=None):
+    if self.pot_type == 'NNP': NNP_prepare(FILE, self.NTYPES)
+    It = int((T_init-T_end)/(Qrate*self.TIMESTEP))
+    with open(self.SCRIPT,'w') as o:
+      o.write('processors\t* * * grid numa\n')
+      o.write('units\t\tmetal\n')
+      o.write('atom_style\tatomic\n')
+      o.write('boundary\tp p p\n')
+      o.write('box\t\ttilt large\n')
+      o.write(f'read_data\t{FILE}\n\n')
+      o.write(set_pot(self.POT, self.pot_type, symbols, self.symbols))
+      o.write(f'thermo\t\t{self.DUMPSTEP} \n')
+      o.write('thermo_modify\tlost ignore flush yes\n\n')
+      if min_init:
+        o.write('fix 1 all box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
+        o.write('minimize 1e-6 1e-10 10000 100000\n')
+        if out == None: o.write(f'write_data\tmin_init.lammps\n')
+        else:           o.write(f'write_data\tmin_init_{out}.lammps\n')
+      o.write(f'velocity\tall create {T_melt} {np.random.randint(low=1,high=100)} dist gaussian\n')
+      if ensemble =='nvt':   o.write(f'fix\t\tTHERMOSTAT all nvt temp {T_melt} {T_melt} 1\n')
+      elif ensemble =='npt': o.write(f'fix\t\tTHERMOSTAT all npt temp {T_melt} {T_melt} 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
+      o.write(f'dump\t\tDUMP all custom {self.DUMPSTEP} dump_mq.lammpstrj id type x y z\n')
+      o.write('dump_modify\tDUMP sort id\n\n')
+      o.write(f'timestep {self.TIMESTEP:.4f}\n')
+      o.write(f'run\t\t50000\n')
+      o.write('unfix THERMOSTAT\n')
+      if ensemble =='nvt':   o.write(f'fix\t\tTHERMOSTAT all nvt temp {T_init} {T_end} 1\n')
+      elif ensemble =='npt': o.write(f'fix\t\tTHERMOSTAT all npt temp {T_init} {T_end} 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
+      o.write(f'run\t\t{It}\n')
+      if min_end:
+        o.write('unfix THERMOSTAT\n')
+        o.write('fix 1 all box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
+        o.write('minimize 1e-6 1e-10 10000 100000\n')
+        if out == None: o.write(f'write_data\tmin_end.lammps\n')
+        else:           o.write(f'write_data\tmin_end_{out}.lammps\n')
+      res = subprocess.check_output([MPIRUN,'-n',NNCORE,LAMMPS,'-in',self.SCRIPT],universal_newlines=True)
+      with open(f'log_mq.x','w') as o: o.write(res)
   
   def NEB(self, FILE, symbols, NEBSTEP):
     # Check running
@@ -82,7 +135,7 @@ class SIMULATOR:
       o.write('thermo_modify\tlost ignore flush yes\n\n')
       o.write(f'variable\t\tu uloop {NEBSTEP}\n')
       o.write(f'reset_timestep 0\n')
-      o.write(f'timestep {self.TIMESTEP:.3f}\n')
+      o.write(f'timestep {self.TIMESTEP:.4f}\n')
       o.write(f'dump\t\tDUMP all custom {self.DUMPSTEP} dump_$u.lammpstrj id type x y z\n')
       o.write('dump_modify\tDUMP sort id\n\n')
       o.write('### quickmin fire cg sd hftn\n')
