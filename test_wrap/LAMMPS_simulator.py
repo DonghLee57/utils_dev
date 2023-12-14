@@ -177,20 +177,21 @@ def NNP_prepare(FILE, NTYPES):
 
 # Write the part related to potential and atom types in the LAMMPS script
 def set_pot(POT, pot_type, symbols, all_symbols):
-  if pot_type == 'NNP': pot_type = 'nn'
-  #if pot_type == 'NNP': pot_type = 'nn/intel' #if SIMD compile
-  elif pot_type == 'tersoff': pot_type = 'tersoff'
   lines, elements, masses, count, bins = '', '', '', 0, []
   for i, item in enumerate(symbols):
     bins.append(item[0])
     elements += f' {item[0]}'
     masses += f'mass\t\t{i+1} {atomic_masses[atomic_numbers[item[0]]]}\n'
   if pot_type == 'NNP':
+    pot_type = 'nn'
+    #pot_type = 'nn/intel' #if SIMD compile
     for i, item in enumerate(all_symbols):
       if not item in bins:
         count    += 1
         elements += f' {item}'
         masses   += f'mass\t\t{count+len(symbols)} {atomic_masses[atomic_numbers[item]]}\n'
+  elif pot_type == 'tersoff':
+    pot_type = 'tersoff'
   lines += f'pair_style  {pot_type}\npair_coeff  * * "{POT}" {elements}\n'
   lines += masses
   return lines
