@@ -11,6 +11,8 @@ NNCORE = sys.argv[1]
 def main():
   POT = sys.argv[2]
   pot_type = 'NNP'
+  # If not NNP,
+  #my_symbol = [['A'],['B']]
   
   if pot_type == 'NNP':
     REF_FILE = './POSCAR'
@@ -41,6 +43,8 @@ class SIMULATOR:
     if self.pot_type == 'NNP':
       self.symbols = subprocess.check_output(['head',f'{self.POT}','-n','1'],universal_newlines=True).split()[1:]
       self.NTYPES = len(self.symbols)
+    elif self.pot_type == 'tersoff':
+      self.symbols = None
     self.SCRIPT = 'script.in'
 
   def by_script(self, SCRIPT):
@@ -175,16 +179,18 @@ def NNP_prepare(FILE, NTYPES):
 def set_pot(POT, pot_type, symbols, all_symbols):
   if pot_type == 'NNP': pot_type = 'nn'
   #if pot_type == 'NNP': pot_type = 'nn/intel' #if SIMD compile
+  elif pot_type == 'tersoff': pot_type = 'tersoff'
   lines, elements, masses, count, bins = '', '', '', 0, []
   for i, item in enumerate(symbols):
     bins.append(item[0])
     elements += f' {item[0]}'
     masses += f'mass\t\t{i+1} {atomic_masses[atomic_numbers[item[0]]]}\n'
-  for i, item in enumerate(all_symbols):
-    if not item in bins:
-      count    += 1
-      elements += f' {item}'
-      masses   += f'mass\t\t{count+len(symbols)} {atomic_masses[atomic_numbers[item]]}\n'
+  if pot_type == 'NNP':
+    for i, item in enumerate(all_symbols):
+      if not item in bins:
+        count    += 1
+        elements += f' {item}'
+        masses   += f'mass\t\t{count+len(symbols)} {atomic_masses[atomic_numbers[item]]}\n'
   lines += f'pair_style  {pot_type}\npair_coeff  * * "{POT}" {elements}\n'
   lines += masses
   return lines
