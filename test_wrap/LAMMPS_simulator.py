@@ -1,5 +1,5 @@
 import numpy as np
-import os, sys, subprocess
+import sys, subprocess
 from ase.io import read, write
 from ase.data import atomic_numbers, atomic_names, atomic_masses, chemical_symbols
 
@@ -21,12 +21,14 @@ def main():
     write('test.lammps', images=tmp, format='lammps-data')
     
   my = SIMULATOR(POT, pot_type)
-  #def script_header(self, FILE, symbols, unit='metal', style='atomic', pbc=[1,1,1]):
+  #def INIT_SCRIPT(self, FILE, symbols, unit='metal', style='atomic', pbc=[1,1,1]):
+  #def REPLICATE(self, nx, ny, nz):
   #def MINIMIZE(self, cell=False):
   #def ANNEAL(self, T, TIME=500, ensemble='nvt'):
   #def QUENCH(self, T_init, T_end=300.0, Qrate=10.0, ensemble='nvt'):
-  my.script_header('test.lammps', symbols,'metal','atomic',[1,1,1])
+  my.INIT_SCRIPT('test.lammps', symbols,'metal','atomic',[1,1,1])
   my.MINIMIZE()
+  my.REPLICATE(2,2,2)
   my.ANNEAL(1000, 10)
   my.QUENCH(1000)
   my.MINIMIZE(cell=True)
@@ -54,11 +56,12 @@ class SIMULATOR:
     self.write_dump = True
     self.run_MD = True
 
-  def script_header(self, FILE, symbols, unit='metal', style='atomic', pbc=[1,1,1]):
+  def INIT_SCRIPT(self, FILE, symbols, unit='metal', style='atomic', pbc=[1,1,1]):
     if self.EXEC == 0:
-        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Initialize "{SCRIPT}"\n')
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Initialize "{SCRIPT}"\n')
     else:
-        with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : Initialize "{SCRIPT}"\n')
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : You tried to initialize the script again. You must initialize it once at first.\n')
+      sys.exit()
     header  = f'processors\t* * * grid numa\n'
     header  = f'units\t\t{unit}\n'
     header += f'atom_style\t{style}\n'
@@ -80,21 +83,29 @@ class SIMULATOR:
     res = subprocess.check_output([MPIRUN, '-n', NNCORE, LAMMPS, '-in', SCRIPT],universal_newlines=True)
     with open('0_log.x','w') as o: o.write(res)
     if self.EXEC == 1:
-        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : LAMMPS running with "{SCRIPT}"\n')
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : LAMMPS running with "{SCRIPT}"\n')
     else:
-        with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : LAMMPS running with "{SCRIPT}"\n')
+      with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : LAMMPS running with "{SCRIPT}"\n')
+
+  def REPLICATE(self, nx, ny, nz):
+    self.EXEC += 1
+    with open(self.SCRIPT,'a') as o: o.write(f'replicate\t\t{nx} {ny} {nz}\n')
+    if self.EXEC == 1:
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : The structure is replicated along the x, y, and z axes by a factor of {nx}, {ny}, and {nz}, respectively\n')
+    else:
+      with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : The structure is replicated along the x, y, and z axes by a factor of {nx}, {ny}, and {nz}, respectively\n')
 
   def MINIMIZE(self, cell=False):
-    self.EXEC +=1
+    self.EXEC += 1
     with open(self.SCRIPT,'a') as o:
       if cell: o.write('fix\t\t1 all box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
       o.write('minimize 1e-6 1e-10 10000 100000\n')
       if cell: o.write('unfix\t\t1\n')
       o.write(f'write_data\t{self.EXEC}_MINIMIZE.lammps\n\n')
     if self.EXEC == 1:
-        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Minimize the structure.\n')
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Minimize the structure.\n')
     else:
-        with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : Minimize the structure.\n')
+      with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : Minimize the structure.\n')
 
   def ANNEAL(self, T, TIME=500, ensemble='nvt'):
     self.EXEC += 1
@@ -116,9 +127,9 @@ class SIMULATOR:
       o.write(f'unfix\t\tTHERMOSTAT\n')
       o.write(f'write_data\t{self.EXEC}_ANNEAL.lammps\n\n')
     if self.EXEC == 1:
-        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Annealing at {T} K during {TIME} ps.\n')
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Annealing at {T} K during {TIME} ps.\n')
     else:
-        with open(self.LOG,'a') as o: o.write(f'{self.EXEC:4d} : Annealing at {T} K during {TIME} ps.\n')
+      with open(self.LOG,'a') as o: o.write(f'{self.EXEC:4d} : Annealing at {T} K during {TIME} ps.\n')
 
   def QUENCH(self, T_init, T_end=300.0, Qrate=10.0, ensemble='nvt'):
     self.EXEC += 1
@@ -140,9 +151,9 @@ class SIMULATOR:
       o.write(f'unfix\t\tTHERMOSTAT\n')
       o.write(f'write_data\t{self.EXEC}_QUENCH.lammps\n\n')
     if self.EXEC == 1:
-        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Quenching with {Qrate} K/ps from {T_init} to {T_end}.\n')
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Quenching with {Qrate} K/ps from {T_init} to {T_end}.\n')
     else:
-        with open(self.LOG,'a') as o: o.write(f'{self.EXEC:4d} : Quenching with {Qrate} K/ps from {T_init} to {T_end}.\n')
+      with open(self.LOG,'a') as o: o.write(f'{self.EXEC:4d} : Quenching with {Qrate} K/ps from {T_init} to {T_end}.\n')
 
   def NEB(self, FILE, symbols, NEBSTEP):
     self.EXEC += 1
@@ -165,16 +176,16 @@ def C2K(T):
   return T+273.15
   
 def get_sorted_symbols(FILE):
-    sample = read(FILE,format='vasp')
-    write('test.lammps',images=sample,format='lammps-data')
-    compare = read('test.lammps',style='atomic',format='lammps-data')
-    vasp_symbols = list(set(sample.get_chemical_symbols()))
-    lammps_symbols = list(set(compare.get_chemical_symbols()))
-    sorted_symbols = []
-    for i, item in enumerate(lammps_symbols):
-        sorted_symbols.append([vasp_symbols[i],atomic_numbers[item]])
-    sorted_symbols.sort()
-    return sorted_symbols
+  sample = read(FILE,format='vasp')
+  write('test.lammps',images=sample,format='lammps-data')
+  compare = read('test.lammps',style='atomic',format='lammps-data')
+  vasp_symbols = list(set(sample.get_chemical_symbols()))
+  lammps_symbols = list(set(compare.get_chemical_symbols()))
+  sorted_symbols = []
+  for i, item in enumerate(lammps_symbols):
+    sorted_symbols.append([vasp_symbols[i],atomic_numbers[item]])
+  sorted_symbols.sort()
+  return sorted_symbols
 
 # Matching the number of atom types with the number of elements in NNP
 def NNP_prepare(FILE, NTYPES):
@@ -209,4 +220,4 @@ def set_pot(POT, pot_type, symbols, all_symbols):
       
 ###
 if __name__ == "__main__":
-    main()
+  main()
