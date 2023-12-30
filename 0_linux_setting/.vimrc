@@ -6,7 +6,7 @@ set autoindent
 set shiftwidth=4
 
 set laststatus=2
-set statusline=\ %<%l:%v\ [%P%=%a\ %h%m%r\ %F\
+set statusline=\ %F\ %=Position\ %=%l:%v\
 
 " sudo apt-get install vim-gui-common
 " sudo apt-get install vim-runtime
