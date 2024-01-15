@@ -78,8 +78,9 @@ class SIMULATOR:
     header +=  'thermo_modify\tlost ignore flush yes\n\n'
     with open(self.SCRIPT,'w') as o: o.write(header)
 
-  def RUN_SCRIPT(self, SCRIPT):
+  def RUN_SCRIPT(self, SCRIPT=None):
     self.EXEC += 1
+    if SCRIPT==None: SCRIPT = self.SCRIPT
     res = subprocess.check_output([MPIRUN, '-n', NNCORE, LAMMPS, '-in', SCRIPT],universal_newlines=True)
     with open('0_log.x','w') as o: o.write(res)
     if self.EXEC == 1:
@@ -212,8 +213,8 @@ def set_pot(POT, pot_type, symbols, all_symbols):
         count    += 1
         elements += f' {item}'
         masses   += f'mass\t\t{count+len(symbols)} {atomic_masses[atomic_numbers[item]]}\n'
-  elif pot_type == 'tersoff':
-    pot_type = 'tersoff'
+  #elif pot_type == 'tersoff':
+  #  pot_type = 'tersoff'
   lines += f'pair_style  {pot_type}\npair_coeff  * * "{POT}" {elements}\n'
   lines += masses
   return lines
