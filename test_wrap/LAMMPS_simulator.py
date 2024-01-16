@@ -52,6 +52,7 @@ class SIMULATOR:
     self.SCRIPT = 'script.in'
     self.EXEC = 0
     self.LOG = 'simulator.log'
+    self.GTHERMO = 'all'
     self.create_vel = True
     self.write_dump = True
     self.run_MD = True
@@ -99,7 +100,7 @@ class SIMULATOR:
   def MINIMIZE(self, cell=False):
     self.EXEC += 1
     with open(self.SCRIPT,'a') as o:
-      if cell: o.write('fix\t\t1 all box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
+      if cell: o.write(f'fix\t\t1 {self.GTHERMO} box/relax iso 0.0 vmax 0.001 fixedpoint 0 0 0\n')
       o.write('minimize 1e-6 1e-10 10000 100000\n')
       if cell: o.write('unfix\t\t1\n')
       o.write(f'write_data\t{self.EXEC}_MINIMIZE.lammps\n\n')
@@ -115,8 +116,8 @@ class SIMULATOR:
       if self.create_vel:
         o.write(f'velocity\tall create {T} {np.random.randint(low=1,high=1000)} dist gaussian\n')
         self.create_vel = False
-      if ensemble =='nvt':   o.write(f'fix\t\tTHERMOSTAT all nvt temp {T} {T} 1\n')
-      elif ensemble =='npt': o.write(f'fix\t\tTHERMOSTAT all npt temp {T} {T} 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
+      if ensemble =='nvt':   o.write(f'fix\t\tTHERMOSTAT {self.GTHERMO} nvt temp {T} {T} 1\n')
+      elif ensemble =='npt': o.write(f'fix\t\tTHERMOSTAT {self.GTHERMO} npt temp {T} {T} 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
       if self.write_dump:
         o.write(f'dump\t\tDUMP all custom {self.DUMPSTEP} dump.lammpstrj id type x y z\n')
         o.write('dump_modify\tDUMP sort id\n\n')
@@ -137,14 +138,14 @@ class SIMULATOR:
     It = int(np.fabs(T_init-T_end)/(Qrate*self.TIMESTEP))
     with open(self.SCRIPT,'a') as o:
       if self.create_vel:
-        o.write(f'velocity\tall create {T} {np.random.randint(low=1,high=1000)} dist gaussian\n')
+        o.write(f'velocity\t{self.GTHERMO} create {T} {np.random.randint(low=1,high=1000)} dist gaussian\n')
         self.create_vel = False
       if self.write_dump:
         o.write(f'dump\t\tDUMP all custom {self.DUMPSTEP} dump.lammpstrj id type x y z\n')
         o.write('dump_modify\t\tDUMP sort id\n\n')
         self.write_dump = False
-      if ensemble =='nvt':   o.write(f'fix\t\tTHERMOSTAT all nvt temp {T_init} {T_end} 1\n')
-      elif ensemble =='npt': o.write(f'fix\t\tTHERMOSTAT all npt temp {T_init} {T_end} 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
+      if ensemble =='nvt':   o.write(f'fix\t\tTHERMOSTAT {self.GTHERMO} nvt temp {T_init} {T_end} 1\n')
+      elif ensemble =='npt': o.write(f'fix\t\tTHERMOSTAT {self.GTHERMO} npt temp {T_init} {T_end} 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
       if self.run_MD:
         o.write(f'timestep\t\t{self.TIMESTEP:.4f}\n')
         self.run_MD = False
@@ -167,23 +168,20 @@ class SIMULATOR:
     else:
         with open(self.LOG,'w') as o: o.write(f'\n{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
 
-  def MK_BLOCK_GROUP(self, name, x=None, y=None, z=None):
+  def MK_BLOCK_GROUP(self, name, x=['EDGE','EDGE'], y=['EDGE','EDGE'], z=['EDGE','EDGE']):
     self.EXEC +=1
-    r_cmd = f'region\t\tr{name} block'
-    if x != None: r_cmd += f' {x[0]} {x[1]} '
-    else:         r_cmd += f' EDGE EDGE '
-    if y != None: r_cmd += f' {y[0]} {y[1]} '
-    else:         r_cmd += f' EDGE EDGE '
-    if z != None: r_cmd += f' {z[0]} {z[1]} '
-    else:         r_cmd += f' EDGE EDGE '
+    r_cmd = f'region\t\tr{name} block {" ".join(x)} {" ".join(y)} {" ".join(z)}\n'
     with open(self.SCRIPT,'a') as o:
       o.write(r_cmd) 
       o.write(f'group\t\t{name} region r{name}\n')
-    if self.EXEC == 1:
-        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Group atoms in the region as {name}.')
-    else:
-        with open(self.LOG,'w') as o: o.write(f'\n{self.EXEC:4d} : Group atoms in the region as {name}.')
 
+  def REGROUP(self, name, names, keyword):
+    self.EXEC +=1
+    cmd = f'group\t\t{name} {keyword} {" ".join(names)}\n'
+    with open(self.SCRIPT,'a') as o: o.write(cmd)
+    self.GTHERMO = name
+
+  
   def NEB(self, FILE, symbols, NEBSTEP):
     self.EXEC += 1
     """
