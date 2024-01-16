@@ -168,14 +168,13 @@ class SIMULATOR:
     else:
         with open(self.LOG,'w') as o: o.write(f'\n{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
 
-  def MK_BLOCK_GROUP(self, name, x=['EDGE','EDGE'], y=['EDGE','EDGE'], z=['EDGE','EDGE']):
+  def MK_GROUP(self, name, keyword, args):
     self.EXEC +=1
-    r_cmd = f'region\t\tr{name} block {" ".join(x)} {" ".join(y)} {" ".join(z)}\n'
     with open(self.SCRIPT,'a') as o:
-      o.write(r_cmd) 
+      o.write(f'region\t\tr{name} {keyword} {" ".join(args)}\n') 
       o.write(f'group\t\t{name} region r{name}\n')
 
-  def REGROUP(self, name, names, keyword):
+  def REGROUP(self, name, keyword, names):
     self.EXEC +=1
     cmd = f'group\t\t{name} {keyword} {" ".join(names)}\n'
     with open(self.SCRIPT,'a') as o: o.write(cmd)
