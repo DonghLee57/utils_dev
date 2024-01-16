@@ -156,6 +156,34 @@ class SIMULATOR:
     else:
       with open(self.LOG,'a') as o: o.write(f'{self.EXEC:4d} : Quenching with {Qrate} K/ps from {T_init} to {T_end}.\n')
 
+  def DEL_OVERLAP(self, distance, g1=None, g2=None):
+    self.EXEC +=1
+    if g1 == None: g1 = 'all'
+    if g2 == None: g2 = 'all'
+    with open(self.SCRIPT,'a') as o:
+      o.write('delete_atoms\t\toverlap {distance:.3f} {g1} {g2}\n')
+    if self.EXEC == 1:
+        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
+    else:
+        with open(self.LOG,'w') as o: o.write(f'\n{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
+
+  def MK_BLOCK_GROUP(self, name, x=None, y=None, z=None):
+    self.EXEC +=1
+    r_cmd = f'region\t\tr{name} block'
+    if x != None: r_cmd += f' {x[0]} {x[1]} '
+    else:         r_cmd += f' EDGE EDGE '
+    if y != None: r_cmd += f' {y[0]} {y[1]} '
+    else:         r_cmd += f' EDGE EDGE '
+    if z != None: r_cmd += f' {z[0]} {z[1]} '
+    else:         r_cmd += f' EDGE EDGE '
+    with open(self.SCRIPT,'a') as o:
+      o.write(r_cmd) 
+      o.write(f'group\t\t{name} region r{name}\n')
+    if self.EXEC == 1:
+        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Group atoms in the region as {name}.')
+    else:
+        with open(self.LOG,'w') as o: o.write(f'\n{self.EXEC:4d} : Group atoms in the region as {name}.')
+
   def NEB(self, FILE, symbols, NEBSTEP):
     self.EXEC += 1
     """
