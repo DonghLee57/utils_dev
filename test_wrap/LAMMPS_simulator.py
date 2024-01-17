@@ -166,7 +166,7 @@ class SIMULATOR:
     if self.EXEC == 1:
         with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
     else:
-        with open(self.LOG,'w') as o: o.write(f'\n{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
+        with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
 
   def MK_GROUP(self, name, keyword, args):
     self.EXEC +=1
