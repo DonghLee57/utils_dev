@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from ase.io import read, write
 from ase import Atoms
-from scipy.constants as CONST
+import scipy.constants as CONST
 
 #
 IDX4REP = np.array([0,1,2,3])
@@ -13,38 +13,38 @@ CIDX_MOL= -1
 def main():
     temp_anneal, time_anneal = 300, 10 # K, ps
 
-    my = SIMULATOR()
+    my = SIMULATOR(temp_anneal)
 
     # initialization
-    my.substrate('POSCAR_substrate.vasp')
-    my.precursor('POSCAR_precursor.vasp')
+    my.set_substrate('POSCAR_substrate.vasp')
+    my.set_precursor('POSCAR_precursor.vasp', 0, list(range(1,5)))
 
-    my.passivation('H', 3, prob=1.0)
-    my.attach()
-    my.optimize()
+    my.passivate('H', 3, prob=1.0)
+    #my.attach()
+    #my.optimize()
 
-    my.determine()
-    my.anneal(temp_anneal, t_anneal)
+    #my.determine()
+    #my.anneal(temp_anneal, t_anneal)
 
 #
 class SIMULATOR(T:float):
     ERRLOG = open('ERRLOG','w')
     q = CONST.e
     kb_eV = CONST.k/q
-    def __init__(self) -> None:
+    def __init__(self, T:float) -> None:
         self.substrate = None
         self.precursor = None
         self.temperature = T
 
-    def substrate(self, POSCAR:str) -> None:
+    def set_substrate(self, POSCAR:str) -> None:
         if self.substrate == None: self.substrate = read(POSCAR)
         else: ERRLOG.write('Your substrate is already assigned.')
 
-    def precursor(self, POSCAR:str, center:int, neighbors) -> None:
+    def set_precursor(self, POSCAR:str, center:int, neighbors) -> None:
         if self.precursor == None:
             self.precursor = read(POSCAR)
-	    self.pre_center = center
-	    self.pre_nei = neighbors
+            self.pre_center = center
+            self.pre_nei = neighbors
         else: ERRLOG.write('Your precursor is already assigned.')
 
     def passivate(self, elem:str, depth:float, prob:float=1.0):
@@ -124,53 +124,33 @@ def vec_ang(v1, v2, exp='rad'):
     elif exp == 'deg':
         return angle*180/np.pi
 
-def fibonacci_sphere(samples:int=1, radius:float=1):
-    """
-    Generates points on a sphere using Fibonacci grid.
-
-    :param samples: Number of points to generate.
-    :param radius: Radius of the sphere.
-    :return: Array of points on the sphere.
-    """
-    points = np.zeros((samples, 3))
+def find_opt_direction(obj, idx:int, length:float=2.0, npts:int=20, radius:float=2.0, r_overlap:float=1.0):
+    #Find the optimal direction for passivation on an atom.
+    # param idx: Atom to passivate.
+    # param obj: ASE Atoms object representing the structure.
+    # param npts: Number of points on the sphere.
+    # param radius: Radius for the Fibonacci grid.
+    # param r_overlap: Minimum allowed distance from other atoms.
+    # return: Optimal direction vector for passivation, None if no valid direction found.
+    fibpts = np.zeros((npts, 3))
     phi = np.pi * (3. - np.sqrt(5.))  # Golden angle
-
     for i in range(samples):
-        y =  1 - (i / float(samples - 1)) * 2  # y goes from 1 to -1
-        R = np.sqrt( 1 - y**2)  # radius at y
-
-        theta = phi * i  # golden angle increment
-
+        y =  1 - (i / float(samples - 1)) * 2
+        R = np.sqrt( 1 - y**2)
+        theta = phi * i
         x = np.cos(theta) * R
         z = np.sin(theta) * R
-
-        points[i] = np.array([x, y, z])*radius
-    return np.array(points)
-
-
-def find_optimal_passivation_direction(IDX, Obj, radius=1.0, samples=1, min_distance=0.5):
-    """
-    Find the optimal direction for passivation on an atom.
-    :param atom: Atom to passivate.
-    :param atoms: ASE Atoms object representing the structure.
-    :param radius: Radius for the Fibonacci grid.
-    :param samples: Number of points to sample on the sphere.
-    :param min_distance: Minimum allowed distance from other atoms.
-    :return: Optimal direction vector for passivation, None if no valid direction found.
-    """
-    fibonacci_points = fibonacci_sphere(samples, radius)
-    optimal_direction = np.zeros(3)
-
-    for ii, point in enumerate(fibonacci_points):
-        test_position = Obj.positions[IDX] + point
+        points[i] = np.array([x, y, z]) * radius
+    fibpts = np.array(fibpts)
+    direction = np.zeros(3)
+    for ii, point in enumerate(fibpts):
+        test_position = obj.positions[idx] + point
         test_atom = Atoms(['X'], positions=[test_position])
-        test_structure = Obj + test_atom
-
+        test_structure = obj + test_atom
         distances = test_structure.get_distances(-1, range(test_structure.get_global_number_of_atoms()-1), mic=True)
-        if len(np.where( distances < min_distance )[0]) == 0:
-            optimal_direction += test_structure.get_distance(IDX, -1, mic=True, vector=True)
-            
-    return optimal_direction/np.linalg.norm(optimal_direction)*2
+        if len(np.where( distances < r_overlap )[0]) == 0:
+            direction += test_structure.get_distance(idx, -1, mic=True, vector=True)
+    return direction/np.linalg.norm(direction)*length
 
 #
 if __name__ == "__main__":
