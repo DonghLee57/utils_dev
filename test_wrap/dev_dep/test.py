@@ -19,7 +19,7 @@ def main():
     my.set_substrate('POSCAR_substrate.vasp')
     my.set_precursor('POSCAR_precursor.vasp', 0, list(range(1,5)))
 
-    my.passivate('H', 3, prob=1.0)
+    my.passivate(my.substrate, 'H', 2)
     #my.attach()
     #my.optimize()
 
@@ -37,7 +37,9 @@ class SIMULATOR(T:float):
         self.temperature = T
 
     def set_substrate(self, POSCAR:str) -> None:
-        if self.substrate == None: self.substrate = read(POSCAR)
+        if self.substrate == None:
+            self.substrate = read(POSCAR)
+            self.old_structure = self.substrate.copy()
         else: ERRLOG.write('Your substrate is already assigned.')
 
     def set_precursor(self, POSCAR:str, center:int, neighbors) -> None:
@@ -47,9 +49,15 @@ class SIMULATOR(T:float):
             self.pre_nei = neighbors
         else: ERRLOG.write('Your precursor is already assigned.')
 
-    def passivate(self, elem:str, depth:float, prob:float=1.0):
+    def passivate(self, obj, elem:str, depth:float, prob:float=1.0):
         if self.substrate != None:
-            pass
+            ids = np.where( obj.positions.T[2] > np.max(obj.positions.T[2]) - depth )[0]
+            for ii, item in enumerate(ids):
+                dvec = find_opt_direction(obj, item, 'H', 2, 50, 2)
+                test_position = obj.positions[item] + dvec
+                test_atom = Atoms([elem], positions=[test_position])
+                obj = obj + test_atom
+            write('exp.vasp',images=obj, format='vasp')
         else: ERRLOG.write('Your substrate is not assigned.')
             
     def optimize(self) -> None:
@@ -108,8 +116,10 @@ def chemisorption():
 """
 # Funtions
 def rot_coords(coords, theta, axis):
+    #Rotate coordinates with angle theta along the axis.
+    # coords: coordinates of atoms
     # theta: radian
-    # axis: arbitarary axis to rotate
+    # axis: axis to rotate
     ux, uy, uz = axis/np.linalg.norm(axis)
     R = np.array([[np.cos(theta)+ux**2*(1-np.cos(theta)),       ux*uy*(1-np.cos(theta))-uz*np.sin(theta),    ux*uz*(1-np.cos(theta))+uy*np.sin(theta)],\
                   [uy*ux*(1-np.cos(theta))+uz*np.sin(theta),    np.cos(theta)+uy**2*(1-np.cos(theta)),       uy*uz*(1-np.cos(theta))-ux*np.sin(theta)],\
@@ -117,6 +127,8 @@ def rot_coords(coords, theta, axis):
     return np.matmul(coords,R)
 
 def vec_ang(v1, v2, exp='rad'):
+    #Calculate the angle between two vectors, v1 and v2.
+    # v1, v2:  same size of vector arrays.
     # exp: 'rad' or 'deg'
     angle = np.arccos(np.round(np.fabs(np.dot(v1,v2))/np.linalg.norm(v1)/np.linalg.norm(v2),4))
     if exp == 'rad':
@@ -124,14 +136,16 @@ def vec_ang(v1, v2, exp='rad'):
     elif exp == 'deg':
         return angle*180/np.pi
 
-def find_opt_direction(obj, idx:int, length:float=2.0, npts:int=20, radius:float=2.0, r_overlap:float=1.0):
+def find_opt_direction(obj, idx:int, elem:str, length:float=2.0, npts:int=20, radius:float=2.0, r_overlap:float=1.0):
     #Find the optimal direction for passivation on an atom.
-    # param idx: Atom to passivate.
     # param obj: ASE Atoms object representing the structure.
+    # param idx: Atom to passivate.
+    # param elem: element for passivation.
+    # param length: distance between the center atom and the passivating atom.
     # param npts: Number of points on the sphere.
     # param radius: Radius for the Fibonacci grid.
     # param r_overlap: Minimum allowed distance from other atoms.
-    # return: Optimal direction vector for passivation, None if no valid direction found.
+    # return: Optimal direction vector for passivation, [0,0,0] if no valid direction found.
     fibpts = np.zeros((npts, 3))
     phi = np.pi * (3. - np.sqrt(5.))  # Golden angle
     for i in range(samples):
@@ -145,7 +159,7 @@ def find_opt_direction(obj, idx:int, length:float=2.0, npts:int=20, radius:float
     direction = np.zeros(3)
     for ii, point in enumerate(fibpts):
         test_position = obj.positions[idx] + point
-        test_atom = Atoms(['X'], positions=[test_position])
+        test_atom = Atoms([elem], positions=[test_position])
         test_structure = obj + test_atom
         distances = test_structure.get_distances(-1, range(test_structure.get_global_number_of_atoms()-1), mic=True)
         if len(np.where( distances < r_overlap )[0]) == 0:
