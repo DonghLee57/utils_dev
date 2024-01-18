@@ -27,7 +27,7 @@ def main():
     #my.anneal(temp_anneal, t_anneal)
 
 #
-class SIMULATOR(T:float):
+class SIMULATOR:
     ERRLOG = open('ERRLOG','w')
     q = CONST.e
     kb_eV = CONST.k/q
@@ -35,6 +35,7 @@ class SIMULATOR(T:float):
         self.substrate = None
         self.precursor = None
         self.temperature = T
+        self.r_overlap = 1.0
 
     def set_substrate(self, POSCAR:str) -> None:
         if self.substrate == None:
@@ -53,10 +54,13 @@ class SIMULATOR(T:float):
         if self.substrate != None:
             ids = np.where( obj.positions.T[2] > np.max(obj.positions.T[2]) - depth )[0]
             for ii, item in enumerate(ids):
-                dvec = find_opt_direction(obj, item, 'H', 2, 50, 2)
+                dvec = find_opt_direction(obj, item, 'H', 2, 50, self.r_overlap)
                 test_position = obj.positions[item] + dvec
                 test_atom = Atoms([elem], positions=[test_position])
-                obj = obj + test_atom
+                test_structure = obj.copy() + test_atom
+                distances = test_structure.get_distances(-1, range(test_structure.get_global_number_of_atoms()-1), mic=True)
+                if len(np.where( distances < self.r_overlap )[0]) == 0:
+                    obj = obj + test_atom
             write('exp.vasp',images=obj, format='vasp')
         else: ERRLOG.write('Your substrate is not assigned.')
             
@@ -136,25 +140,24 @@ def vec_ang(v1, v2, exp='rad'):
     elif exp == 'deg':
         return angle*180/np.pi
 
-def find_opt_direction(obj, idx:int, elem:str, length:float=2.0, npts:int=20, radius:float=2.0, r_overlap:float=1.0):
+def find_opt_direction(obj, idx:int, elem:str, radius:float=2.0, npts:int=20, r_overlap:float=1.0):
     #Find the optimal direction for passivation on an atom.
     # param obj: ASE Atoms object representing the structure.
     # param idx: Atom to passivate.
     # param elem: element for passivation.
-    # param length: distance between the center atom and the passivating atom.
-    # param npts: Number of points on the sphere.
     # param radius: Radius for the Fibonacci grid.
+    # param npts: Number of points on the sphere.
     # param r_overlap: Minimum allowed distance from other atoms.
     # return: Optimal direction vector for passivation, [0,0,0] if no valid direction found.
     fibpts = np.zeros((npts, 3))
     phi = np.pi * (3. - np.sqrt(5.))  # Golden angle
-    for i in range(samples):
-        y =  1 - (i / float(samples - 1)) * 2
+    for i in range(npts):
+        y =  1 - (i / float(npts - 1)) * 2
         R = np.sqrt( 1 - y**2)
         theta = phi * i
         x = np.cos(theta) * R
         z = np.sin(theta) * R
-        points[i] = np.array([x, y, z]) * radius
+        fibpts[i] = np.array([x, y, z]) * radius
     fibpts = np.array(fibpts)
     direction = np.zeros(3)
     for ii, point in enumerate(fibpts):
@@ -164,8 +167,8 @@ def find_opt_direction(obj, idx:int, elem:str, length:float=2.0, npts:int=20, ra
         distances = test_structure.get_distances(-1, range(test_structure.get_global_number_of_atoms()-1), mic=True)
         if len(np.where( distances < r_overlap )[0]) == 0:
             direction += test_structure.get_distance(idx, -1, mic=True, vector=True)
-    return direction/np.linalg.norm(direction)*length
-
+    return direction/np.linalg.norm(direction)*radius
+ 
 #
 if __name__ == "__main__":
     main()
