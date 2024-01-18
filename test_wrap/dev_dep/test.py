@@ -4,12 +4,6 @@ from ase.io import read, write
 from ase import Atoms
 import scipy.constants as CONST
 
-#
-IDX4REP = np.array([0,1,2,3])
-CIDX_REF= -1
-IDX4RM  = 0
-CIDX_MOL= -1
-
 def main():
     temp_anneal, time_anneal = 300, 10 # K, ps
 
@@ -19,7 +13,8 @@ def main():
     my.set_substrate('POSCAR_substrate.vasp')
     my.set_precursor('POSCAR_precursor.vasp', 0, list(range(1,5)))
 
-    my.passivate(my.substrate, 'H', 2)
+    my.passivate('H', 1.5)
+    
     #my.attach()
     #my.optimize()
 
@@ -46,12 +41,14 @@ class SIMULATOR:
     def set_precursor(self, POSCAR:str, center:int, neighbors) -> None:
         if self.precursor == None:
             self.precursor = read(POSCAR)
+            self.precursor.translate(-self.precursor.get_center_of_mass())
             self.pre_center = center
             self.pre_nei = neighbors
         else: ERRLOG.write('Your precursor is already assigned.')
 
-    def passivate(self, obj, elem:str, depth:float, prob:float=1.0):
-        if self.substrate != None:
+    def passivate(self, elem:str, depth:float, prob:float=1.0):
+        if self.old_substrate != None:
+            obj = self.old_substrate
             ids = np.where( obj.positions.T[2] > np.max(obj.positions.T[2]) - depth )[0]
             for ii, item in enumerate(ids):
                 dvec = find_opt_direction(obj, item, 'H', 2, 50, self.r_overlap)
@@ -59,23 +56,47 @@ class SIMULATOR:
                 test_atom = Atoms([elem], positions=[test_position])
                 test_structure = obj.copy() + test_atom
                 distances = test_structure.get_distances(-1, range(test_structure.get_global_number_of_atoms()-1), mic=True)
-                if len(np.where( distances < self.r_overlap )[0]) == 0:
+                if (len(np.where( distances < self.r_overlap )[0]) == 0) and np.random.rand() < prob:
                     obj = obj + test_atom
-            write('exp.vasp',images=obj, format='vasp')
-        else: ERRLOG.write('Your substrate is not assigned.')
-            
-    def optimize(self) -> None:
+            return obj
+        else:
+            ERRLOG.write('Your substrate is not assigned.')
+            sys.exit()
+
+    def search(self, elem:str, length:float):
+        arr = []
+        return arr
+    
+    def optimize(self):
         if self.substrate != None:
             pass
         else: ERRLOG.write('Your substrate is not assigned.')
 
-    def attach(self):
-        if self.substrate != None:
-            pass
-        else: ERRLOG.write('Your substrate is not assigned.')
-        if self.precursor != None:
-            pass
-        else: ERRLOG.write('Your precursor is not assigned.')
+    # debugging
+    def attach(self, idx_ref):
+        if self.old_structure != None:
+            if self.precursor != None:
+                NEW = Atoms('X',cell=self.old_structure.cell, pbc=[1,1,1])
+                NEW+= self.old_structure.copy()
+                mol = self.precursor.copy()
+                # modify...
+                ax_m = mol.positions[self.pre_center] - mol.positions[self.pre_nei[0]]
+                del mol[self.pre_nei[0]]
+                ax_b = NEW.positions[idx_ref] - REF_STR.positions[bond]
+                ax_r = np.cross(ax_m, ax_b)
+                theta = np.arccos( np.round( np.dot(ax_m,ax_b)/np.linalg.norm(ax_m)/np.linalg.norm(ax_b) , 4) )
+                if theta < 1E-4:
+                    mol.positions = (-1)*(mol.positions)
+                else:
+                    mol.positions = (-1)*rot_coords(mol.positions, -theta, AX_r)
+                mol.translate(NEW.positions[bond])
+                pass
+            else:
+                ERRLOG.write('Your precursor is not assigned.')
+                sys.exit()
+        else:
+            ERRLOG.write('Your substrate is not assigned.')
+            sys.exit()
 
     def determine(self, temperature) -> None:
         oldE = calculate_energy(self.old_structure)
@@ -90,34 +111,7 @@ class SIMULATOR:
 
     def anneal(self, temperature, time) -> None:
         pass
-#
-"""
-def chemisorption():
-    REF_STR = read(sys.argv[1],format='vasp')
 
-    # Replace the assinged bonds
-    NEW = Atoms('X',cell=REF_STR.cell, pbc=[1,1,1])
-    NEW += REF_STR[CIDX_REF]
-    for bidx, bond in enumerate(IDX4REP):
-        SUB_MOL = read(sys.argv[2],format='vasp')
-        SUB_MOL.translate(-SUB_MOL.get_center_of_mass())
-        AX_m = SUB_MOL.positions[CIDX_MOL] - SUB_MOL.positions[IDX4RM]
-        del SUB_MOL[IDX4RM]
-        AX_b = REF_STR.positions[CIDX_REF] - REF_STR.positions[bond]
-        AX_r = np.cross(AX_m, AX_b)
-        theta = np.arccos(np.round(np.dot(AX_m,AX_b)/np.linalg.norm(AX_m)/np.linalg.norm(AX_b),4))
-        if theta < 1E-4:
-            SUB_MOL.positions = (-1)*(SUB_MOL.positions)
-        else:
-            SUB_MOL.positions = (-1)*rot_coords(SUB_MOL.positions, -theta, AX_r)
-        SUB_MOL.translate(REF_STR.positions[bond])
-        NEW += SUB_MOL.copy()
-
-    # Write the output       
-    del NEW[0]
-    NEW = NEW[NEW.numbers.argsort()]
-    write('POSCAR_replace.vasp',images=NEW, format='vasp')
-"""
 # Funtions
 def rot_coords(coords, theta, axis):
     #Rotate coordinates with angle theta along the axis.
