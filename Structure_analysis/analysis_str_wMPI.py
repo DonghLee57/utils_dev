@@ -1,12 +1,14 @@
-import sys, os
+import sys, os, glob
 import numpy as np
+import itertools
+# combi = list(itertools.combinations(['A','B','C'],2)) # [('A','B'), ('A','C'), ('B','C')]
 from ase import Atoms
 from ase.io import read
-import matplotlib.pyplot as plt
 from mpi4py import MPI
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
+import matplotlib.pyplot as plt
 
 ### Pre-defined parameters
 start, end, step = 0, 101 , 1
@@ -74,8 +76,8 @@ def main():
             ADF /= nimg
         if True:
             UNWRAP = unwrapping(tmp, ELEMENTS=SELECT_ELEMENTS) # ATOMS=SELECT_ATOMS
-            # One-line
-#            MSD_xyz = np.sum(np.power(UNWRAP - UNWRAP[0],2),axis=1)/UNWRAP.shape[1]; print(MSD_xyz);
+            #One-line
+            #MSD_xyz = np.sum(np.power(UNWRAP - UNWRAP[0],2),axis=1)/UNWRAP.shape[1]; print(MSD_xyz);
             MSD = np.sum(np.sum(np.power(UNWRAP - UNWRAP[0],2),axis=1),axis=-1)/UNWRAP.shape[1]
             # Parallel?
     
@@ -85,7 +87,7 @@ def main():
         #plot_rdf(RDF)
         #plot_prdf(PRDF)
         #plot_adf(ADF, triplet_label=f'(triplet[1])-{triplet[0]}-{triplet[2]}')
-        plot_msd(MSD, TIMESTEP=1000, unit='ps')
+        #plot_msd(MSD, TIMESTEP=1000, unit='ps')
         pass
 
 ###
@@ -107,7 +109,7 @@ def get_rdf(Obj, savefile='rdf.out'):
     res = np.histogram(dist,bins=bins)
     rdf = volume*res[0]/(NIONS**2*4*np.pi*res[1][:-1]**2*dr)
     if rank == 0: np.savetxt(savefile, [res[1][:-1], rdf], fmt='%.4f')
-    return res[1][:-1], rdf
+    return [res[1][:-1], rdf]
 
 def plot_rdf(RDF, savefile='Total_RDF.png'):
     fig,ax = plt.subplots()
@@ -120,6 +122,24 @@ def plot_rdf(RDF, savefile='Total_RDF.png'):
     ax.set_ylim(bottom=0)
     plt.savefig(savefile)
     return 0
+
+"""
+def plot_prdf(PRDF):
+    fig,ax = plt.subplots()
+    comb = PRDF[1].keys()
+    for idx, pair in enumerate(comb):
+        ax.plot(PRDF[0], PRDF[1][pair], label=f'{pair}')
+        print(f"{pair}")
+        print(f"Peak height: {np.max(PRDF[1][pair]):.2f}")
+        print(f"Peak position: {PRDF[0][np.argmax(PRDF[1][pair])]:.2f}")
+    ax.set_xlabel(r'Distance ($\mathrm{\AA}$)',fontsize=fs)
+    ax.set_ylabel('g(r)',fontsize=fs)
+    ax.set_xlim([0,r_max])
+    ax.set_ylim(bottom=0)
+    ax.legend()
+    plt.savefig('Partial_RDF.png')
+    return 0
+"""
 
 def get_prdf(Obj, types, targets=None, savefile='prdf.out'):
     # targets: ["element1", "element2"]
@@ -134,7 +154,6 @@ def get_prdf(Obj, types, targets=None, savefile='prdf.out'):
                 for jdx, j in enumerate(types):
                     if idx <= jdx:
                         combinations.append([i,j])
-            fig,ax = plt.subplots()
         else:
             combinations = None
         combinations = comm.bcast(combinations, root=0)
@@ -161,23 +180,7 @@ def get_prdf(Obj, types, targets=None, savefile='prdf.out'):
         prdf[key] = rdf.copy()
         if rank == 0:
             np.savetxt(key+'_'+savefile, [res[1][:-1], prdf[key]], fmt='%.4f')
-    return res[1][:-1], prdf
-
-def plot_prdf(PRDF):
-    fig,ax = plt.subplots()
-    comb = PRDF[1].keys()
-    for idx, pair in enumerate(comb):
-        ax.plot(PRDF[0], PRDF[1][pair], label=f'{pair}')
-        print(f"{pair}")
-        print(f"Peak height: {np.max(PRDF[1][pair]):.2f}")
-        print(f"Peak position: {PRDF[0][np.argmax(PRDF[1][pair])]:.2f}")
-    ax.set_xlabel(r'Distance ($\mathrm{\AA}$)',fontsize=fs)
-    ax.set_ylabel('g(r)',fontsize=fs)
-    ax.set_xlim([0,r_max])
-    ax.set_ylim(bottom=0)
-    ax.legend()
-    plt.savefig('Partial_RDF.png')
-    return 0
+    return [res[1][:-1], prdf]
     
 def get_adf(Obj, targets, cutoff, angle_lim=[0, 180], expr='degree'):
     # To facilitate a clear bond angle analysis, the target triplet with cutoff distances should be provided.
@@ -247,7 +250,7 @@ def get_adf(Obj, targets, cutoff, angle_lim=[0, 180], expr='degree'):
     theta = comm.bcast(theta, root=0)
     if expr == 'degree': theta = np.array(theta)*180/np.pi
     res = np.histogram(theta,bins=bins)
-    return res[1][:-1], res[0]
+    return [res[1][:-1], res[0]]
     
 def plot_adf(ADF, expr='degree', triplet_label=''):
     fig,ax = plt.subplots()
