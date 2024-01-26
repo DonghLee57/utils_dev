@@ -74,7 +74,7 @@ def main():
                 if ADF == None:  ADF     = get_adf(img, triplet, rc4angle, angle_lim=angle_lim)
                 else:            ADF[1] += get_adf(img, triplet, rc4angle, angle_lim=angle_lim)
             ADF /= nimg
-        if True:
+        if False:
             UNWRAP = unwrapping(tmp, ELEMENTS=SELECT_ELEMENTS) # ATOMS=SELECT_ATOMS
             #One-line
             #MSD_xyz = np.sum(np.power(UNWRAP - UNWRAP[0],2),axis=1)/UNWRAP.shape[1]; print(MSD_xyz);
@@ -83,9 +83,13 @@ def main():
     
     # Plotting data
     if True and rank == 0:
-        #if os.path.isfile(RDF_FILE): RDF = np.loadtxt(RDF_FILE)
-        #plot_rdf(RDF)
-        #plot_prdf(PRDF)
+        if os.path.isfile(RDF_FILE): RDF = np.loadtxt(RDF_FILE)
+        plot_rdf(RDF)
+        my_prdf = glob.glob("*"+PRDF_FILE)
+        if len(my_prdf) > 0:
+            for i in range(len(my_prdf)):
+                PRDF = np.loadtxt(my_prdf[i])
+                plot_rdf(PRDF, my_prdf[i].split('_')[0]+"PRDF.png")
         #plot_adf(ADF, triplet_label=f'(triplet[1])-{triplet[0]}-{triplet[2]}')
         #plot_msd(MSD, TIMESTEP=1000, unit='ps')
         pass
