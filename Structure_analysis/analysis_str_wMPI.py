@@ -1,7 +1,6 @@
 import sys, os, glob
 import numpy as np
 import itertools
-# combi = list(itertools.combinations(['A','B','C'],2)) # [('A','B'), ('A','C'), ('B','C')]
 from ase import Atoms
 from ase.io import read
 from mpi4py import MPI
@@ -9,12 +8,13 @@ comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter1d
 
 ### Pre-defined parameters
 start, end, step = 0, 101 , 1
 # RDF-related parameter
-r_max= 3
-dr = 0.01
+r_max= 5
+dr = 0.02
 RDF_FILE = 'rdf.out'
 PRDF_FILE = 'prdf.out'
 # ADF-related parameter
@@ -148,6 +148,7 @@ def get_prdf(Obj, types, targets=None, savefile='prdf.out'):
     symbols = np.array(Obj.get_chemical_symbols())
     volume = np.fabs(np.linalg.det(Obj.cell))
     if targets == None:
+        #combinations = list(itertools.combinations(targets, 2))
         if rank == 0:
             combinations = []
             for idx, i in enumerate(types):
