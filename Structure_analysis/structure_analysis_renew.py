@@ -28,10 +28,10 @@ class StructureAnalysis:
         if compress: write('INPUT_STR.vasp',images=self.structure, format='vasp-xdatcar')
 
     def calculate_rdf(self, rmax, dr=0.02):
-        nimg = len(self.structure)
         bins = np.arange(dr/2, rmax+dr/2, dr)
         rdf = np.zeros(len(bins)-1)
-        for n, atoms in enumerate(self.structure):
+        if ( str(type(self.structure[0])) == "<class 'ase.atom.Atom'>" ):
+            atoms = self.structure.copy()
             if rmax > atoms.get_cell().diagonal().min() / 2:
                 print('WARNING: The input maximum radius is over the half the smallest cell dimension.')
             nions = atoms.get_global_number_of_atoms()
@@ -40,6 +40,18 @@ class StructureAnalysis:
                 dist[i] = atoms.get_distances(i, range(nions), mic=True)
             res, bin_edges = np.histogram(dist, bins=bins)
             rdf += res / ( (nions**2 / atoms.get_volume()) * 4 * np.pi * dr * bin_edges[:-1]**2 )
+        elif ( str(type(self.structure[0])) == "<class 'ase.atoms.Atoms'>" ):
+            nimg = len(self.structure)
+            for n, atoms in enumerate(self.structure):
+                if rmax > atoms.get_cell().diagonal().min() / 2:
+                    print('WARNING: The input maximum radius is over the half the smallest cell dimension.')
+                nions = atoms.get_global_number_of_atoms()
+                dist = np.zeros((nions, nions))
+                for i in range(nions):
+                    dist[i] = atoms.get_distances(i, range(nions), mic=True)
+                res, bin_edges = np.histogram(dist, bins=bins)
+                rdf += res / ( (nions**2 / atoms.get_volume()) * 4 * np.pi * dr * bin_edges[:-1]**2 )
+            rdf /= nimg
         return [bin_edges[:-1], rdf]
 
     def calculate_prdf(self, element1, element2,  dr=0.02, r_max=None):
