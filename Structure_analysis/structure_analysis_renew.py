@@ -16,8 +16,13 @@ def main():
     #my = StructureAnalysis('my.lammps', 'lammps-data')
     #my = StructureAnalysis('dump.lammpstrj', 'lammps-dump-text', index=slice(0,1000,10), compress=True)
     
-    rdf  = my.calculate_rdf()
-    prdf = my.calculate_prdf()
+    rdf  = my.calculate_rdf(6)
+    np.savetxt('rdf.out', rdf, fmt='%.4f')
+
+    prdf = my.calculate_prdf('Si','Si',6)
+    np.savetxt('prdf.out', prdf, fmt='%.4f')
+
+    
     adf  = my.calculate_adf()
     return 0
 
@@ -43,7 +48,7 @@ class StructureAnalysis:
         elif ( str(type(self.structure[0])) == "<class 'ase.atoms.Atoms'>" ):
             nimg = len(self.structure)
             for n, atoms in enumerate(self.structure):
-                if rmax > atoms.get_cell().diagonal().min() / 2:
+                if ( n == 0 ) and (rmax > atoms.get_cell().diagonal().min() / 2) :
                     print('WARNING: The input maximum radius is over the half the smallest cell dimension.')
                 nions = atoms.get_global_number_of_atoms()
                 dist = np.zeros((nions, nions))
@@ -54,28 +59,38 @@ class StructureAnalysis:
             rdf /= nimg
         return [bin_edges[:-1], rdf]
 
-    def calculate_prdf(self, element1, element2,  dr=0.02, r_max=None):
-        nimg = len(self.structure)
-        rdf = np.zeros(bins)
-        if r_max is None:
-            r_max = atoms.get_cell().diagonal().min() / 2  # Half the smallest cell dimension
-        bins = np.arange(dr/2, r_max, dr)
-        distances = []
-        for n, atoms in enumerate(self.structure):
-            for i in range(len(atoms)):
-                if atoms[i].symbol != element1:
-                    continue
-                for j in range(len(atoms)):
-                    if i != j and atoms[j].symbol == element2:
-                        # Compute distance between atoms i and j
-                        distance = atoms.get_distance(i, j, mic=True)
-                        if distance < r_max:
-                            distances.append(distance)
-            res, bin_edges = np.histogram(distances, bins=bins)
-            n_element1 = len([atom for atom in atoms if atom.symbol == element1])
-            n_element2 = len([atom for atom in atoms if atom.symbol == element2])
-            rdf += res / (n_element1 * n_element2 / atoms.get_volume() * 4 * np.pi * dr * bin_edges[:-1]**2)
-        return bin_edges[1:], rdf
+    def calculate_prdf(self, elemA, elemB, rmax,  dr=0.02):
+        bins = np.arange(dr/2, rmax+dr/2, dr)
+        rdf = np.zeros(len(bins)-1)
+        if ( str(type(self.structure[0])) == "<class 'ase.atom.Atom'>" ):
+            atoms = self.structure.copy()
+            if rmax > atoms.get_cell().diagonal().min() / 2:
+                print('WARNING: The input maximum radius is over the half the smallest cell dimension.')
+            idA = np.where( np.array(atoms.get_chemical_symbols()) == elemA )[0]
+            nelemA = len(idA)
+            idB = np.where( np.array(atoms.get_chemical_symbols()) == elemB )[0]
+            nelemB = len(idB)
+            dist = np.zeros((nelemA, nelemB))
+            for i, idx in enumerate(idA):
+                dist[i] = atoms.get_distances(idx, idB, mic=True)
+            res, bin_edges = np.histogram(dist, bins=bins)
+            rdf += res / (nelemA * nelemB / atoms.get_volume() * 4 * np.pi * dr * bin_edges[:-1]**2)
+        elif ( str(type(self.structure[0])) == "<class 'ase.atoms.Atoms'>" ):
+            nimg = len(self.structure)
+            for n, atoms in enumerate(self.structure):
+                if ( n == 0 ) and (rmax > atoms.get_cell().diagonal().min() / 2) :
+                    print('WARNING: The input maximum radius is over the half the smallest cell dimension.')
+                idA = np.where( np.array(atoms.get_chemical_symbols()) == elemA )[0]
+                nelemA = len(idA)
+                idB = np.where( np.array(atoms.get_chemical_symbols()) == elemB )[0]
+                nelemB = len(idB)
+                dist = np.zeros((nelemA, nelemB))
+                for i, idx in enumerate(idA):
+                    dist[i] = atoms.get_distances(idx, idB, mic=True)
+                res, bin_edges = np.histogram(dist, bins=bins)
+                rdf += res / (nelemA * nelemB / atoms.get_volume() * 4 * np.pi * dr * bin_edges[:-1]**2)
+            rdf /= nimg
+        return [bin_edges[:-1], rdf]
     
     def calculate_adf(self, bins=100, r_max=None):
         nimg = len(self.structure)
