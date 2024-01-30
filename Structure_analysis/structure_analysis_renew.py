@@ -19,7 +19,7 @@ def main():
     rdf  = my.calculate_rdf(6)
     np.savetxt('rdf.out', rdf, fmt='%.4f')
 
-    prdf = my.calculate_prdf('Si','Si',6)
+    prdf = my.calculate_prdf(['Si','Si'],6)
     np.savetxt('prdf.out', prdf, fmt='%.4f')
 
     
@@ -59,7 +59,10 @@ class StructureAnalysis:
             rdf /= nimg
         return [bin_edges[:-1], rdf]
 
-    def calculate_prdf(self, elemA, elemB, rmax,  dr=0.02):
+    def calculate_prdf(self, targets, rmax,  dr=0.02):
+        # targets: ["Element 1", "Element 2"]
+        # ex) ["Si", "O"]
+        [elemA, elemB] = targets
         bins = np.arange(dr/2, rmax+dr/2, dr)
         rdf = np.zeros(len(bins)-1)
         if ( str(type(self.structure[0])) == "<class 'ase.atom.Atom'>" ):
@@ -92,31 +95,137 @@ class StructureAnalysis:
             rdf /= nimg
         return [bin_edges[:-1], rdf]
     
-    def calculate_adf(self, bins=100, r_max=None):
-        nimg = len(self.structure)
-        rdf = np.zeros(bins)
-        if r_max is None:
-            r_max = atoms.get_cell().diagonal().min() / 2  # Half the smallest cell dimension
-        bins = np.arange(dr/2, r_max, dr)
-        angles = []
-        for i in range(len(atoms)):
-            neighbors_i = atoms.get_neighbors(i, r_max)[0]
-            for j in neighbors_i:
-                if j.index <= i:  # Avoid double counting
-                    continue
-                neighbors_j = atoms.get_neighbors(j.index, r_max)[0]
-                for k in neighbors_j:
-                    if k.index <= j.index:
-                        continue
-                    # Calculate angle i-j-k
-                    vec_ij = atoms.positions[j.index] - atoms.positions[i]
-                    vec_jk = atoms.positions[k.index] - atoms.positions[j.index]
-                    angle = np.arccos(np.dot(vec_ij, vec_jk) / (np.linalg.norm(vec_ij) * np.linalg.norm(vec_jk)))
-                    angle = np.degrees(angle)  # Convert to degrees
-                    angles.append(angle)
-        # Create a histogram of angles
-        adf, bin_edges = np.histogram(angles, bins=bins, range=(0, 180), density=True)
-        return bin_edges[1:], adf     
+    def calculate_adf(self, targets, cutoff, angle_bins=np.arange(0,180.1,2), expr='degree'):
+        # To facilitate a clear bond angle analysis, the target triplet with cutoff distances should be provided.
+        # targets: ["Center", "Neighbor_1", "Neighbor_2"]
+        # ex) ["Si", "Si", "O"]
+        # cutoff: [r_1, r_2]
+        # ex) [2.6, 2.0]
+        if expr != 'degree': angle_bins = angle_bins*np.pi/180
+        if ( str(type(self.structure[0])) == "<class 'ase.atom.Atom'>" ):
+            atoms = self.structure.copy()
+            symbols = np.array(atoms.get_chemical_symbols())
+            cidx = np.where( targets[0] == symbols )[0]
+            nidx = np.where( targets[1] == symbols )[0]
+            midx = np.where( targets[2] == symbols )[0]
+            theta = []
+            psize = len(cidx)//size
+            if targets[1] == targets[2]:
+                if rank == size-1:
+                    for c in range(rank*psize,len(cidx)):
+                        for n in range(len(nidx)):
+                            vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                            dist1 = np.linalg.norm(vec1)
+                            if dist1 < cutoff[0]:
+                                for m in range(len(midx)):
+                                    if m > n:
+                                        vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                        dist2 = np.linalg.norm(vec2)
+                                        if dist2 < cutoff[1]:
+                                            theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+                else:
+                    for c in range(rank*psize,(rank+1)*psize):
+                        for n in range(len(nidx)):
+                            vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                            dist1 = np.linalg.norm(vec1)
+                            if dist1 < cutoff[0]:
+                                for m in range(len(midx)):
+                                    if m > n:
+                                        vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                        dist2 = np.linalg.norm(vec2)
+                                        if dist2 < cutoff[1]:
+                                            theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+            else:
+                if rank == size-1:
+                    for c in range(rank*psize,len(cidx)):
+                        for n in range(len(nidx)):
+                            vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                            dist1 = np.linalg.norm(vec1)
+                            if dist1 < cutoff[0]:
+                                for m in range(len(midx)):
+                                    if m != n:
+                                        vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                        dist2 = np.linalg.norm(vec2)
+                                        if dist2 < cutoff[1]:
+                                            theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+                else:
+                    for c in range(rank*psize,(rank+1)*psize):
+                        for n in range(len(nidx)):
+                            vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                            dist1 = np.linalg.norm(vec1)
+                            if dist1 < cutoff[0]:
+                                for m in range(len(midx)):
+                                    if m != n:
+                                        vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                        dist2 = np.linalg.norm(vec2)
+                                        if dist2 < cutoff[1]:
+                                            theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+        elif ( str(type(self.structure[0])) == "<class 'ase.atoms.Atoms'>" ):
+            nimg = len(self.structure)
+            for n, atoms in enumerate(self.structure):
+                symbols = np.array(atoms.get_chemical_symbols())
+                cidx = np.where( targets[0] == symbols )[0]
+                nidx = np.where( targets[1] == symbols )[0]
+                midx = np.where( targets[2] == symbols )[0]
+                theta = []
+                psize = len(cidx)//size
+                if targets[1] == targets[2]:
+                    if rank == size-1:
+                        for c in range(rank*psize,len(cidx)):
+                            for n in range(len(nidx)):
+                                vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                                dist1 = np.linalg.norm(vec1)
+                                if dist1 < cutoff[0]:
+                                    for m in range(len(midx)):
+                                        if m > n:
+                                            vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                            dist2 = np.linalg.norm(vec2)
+                                            if dist2 < cutoff[1]:
+                                                theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+                    else:
+                        for c in range(rank*psize,(rank+1)*psize):
+                            for n in range(len(nidx)):
+                                vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                                dist1 = np.linalg.norm(vec1)
+                                if dist1 < cutoff[0]:
+                                    for m in range(len(midx)):
+                                        if m > n:
+                                            vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                            dist2 = np.linalg.norm(vec2)
+                                            if dist2 < cutoff[1]:
+                                                theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+                else:
+                    if rank == size-1:
+                        for c in range(rank*psize,len(cidx)):
+                            for n in range(len(nidx)):
+                                vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                                dist1 = np.linalg.norm(vec1)
+                                if dist1 < cutoff[0]:
+                                    for m in range(len(midx)):
+                                        if m != n:
+                                            vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                            dist2 = np.linalg.norm(vec2)
+                                            if dist2 < cutoff[1]:
+                                                theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+                    else:
+                        for c in range(rank*psize,(rank+1)*psize):
+                            for n in range(len(nidx)):
+                                vec1 = atoms.get_distances(cidx[c], nidx[n], mic=True, vector=True)
+                                dist1 = np.linalg.norm(vec1)
+                                if dist1 < cutoff[0]:
+                                    for m in range(len(midx)):
+                                        if m != n:
+                                            vec2 = atoms.get_distances(cidx[c], midx[m], mic=True, vector=True)
+                                            dist2 = np.linalg.norm(vec2)
+                                            if dist2 < cutoff[1]:
+                                                theta.append(np.arccos(np.round(np.dot(vec1, vec2.T)[0]/dist1/dist2,6)))
+        theta = comm.reduce(theta,op=MPI.SUM,root=0)
+        theta = comm.bcast(theta, root=0)
+        if expr == 'degree': theta = np.array(theta)*180/np.pi
+        res, bin_edges = np.histogram(theta, bins=angle_bins, density=True)
+        return [bin_edges[:-1], res]
+
+
 
 ###
 if __name__ == "__main__":
