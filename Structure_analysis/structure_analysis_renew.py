@@ -224,8 +224,41 @@ class StructureAnalysis:
         if expr == 'degree': theta = np.array(theta)*180/np.pi
         res, bin_edges = np.histogram(theta, bins=angle_bins, density=True)
         return [bin_edges[:-1], res]
-
-
+        
+    def unwrapping(self, selected_atoms=None, selected_elem=None):
+        if ( str(type(self.structure[0])) == "<class 'ase.atoms.Atoms'>" ):
+            atoms = self.structures.copy()
+            nimg = len(self.structure)
+            unwrap_traj = np.zeros((nimg, len(targets), 3))
+            if selected_elem !=  None:
+                targets = np.where( selected_elem == np.array(self.structure[0].get_chemical_symbols()) )[0]
+            if selected_atoms != None:
+                targets = selected_atoms
+            img0 = atoms.get_positions()[targets]
+            unwrap_traj[0] = img0.copy()
+            lattice = img0.cell.copy()
+            old = img0.get_scaled_positions()
+            psize = len(targets)//size
+            if rank == size-1:
+                parts = np.arange(rank*psize,len(targets))
+                for idx in range(1, nimg):
+                    new = atoms[idx].get_scaled_positions()
+                    diff = new[targets[parts]] - old[targets[parts]]
+                    unwrap_traj[idx][parts] = unwrap_traj[idx-1][parts] + (np.round(-diff)+diff)@lattice
+                    old = atoms[idx].get_scaled_positions()
+            else:
+                parts = np.arange(rank*psize,(rank+1)*psize)
+                for idx in range(1, nimg):
+                    new = atoms[idx].get_scaled_positions()
+                    diff = new[targets[parts]] - old[targets[parts]]
+                    unwrap_traj[idx][parts] = unwrap_traj[idx-1][parts] + (np.round(-diff)+diff)@lattice
+                    old = atoms[idx].get_scaled_positions()
+            unwrap_traj = comm.reduce(unwrap_traj, op=MPI.SUM, root=0)
+            unwrap_traj = comm.bcast(unwrap_traj, root=0)
+            return unwrap_traj
+        else:
+            print("WARNING: Cannot unwrap atomic coordinates in a single structure.")
+            return None
 
 ###
 if __name__ == "__main__":
