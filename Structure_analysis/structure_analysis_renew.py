@@ -1,3 +1,4 @@
+#import cProfile
 import sys, os, glob
 import numpy as np
 import itertools
