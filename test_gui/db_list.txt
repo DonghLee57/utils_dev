@@ -1,0 +1,14 @@
+# project 1
+
+[type1]
+./my_db/file-H1
+./my_db/file-H2
+
+[type2]
+./my_db/file-HLi1
+./my_db/file-HLi2
+
+# project 2
+[type1]
+./my_db/file-H1
+./my_db/file-HLi2
