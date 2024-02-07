@@ -162,7 +162,7 @@ class SIMULATOR:
     if g1 == None: g1 = 'all'
     if g2 == None: g2 = 'all'
     with open(self.SCRIPT,'a') as o:
-      o.write('delete_atoms\t\toverlap {distance:.3f} {g1} {g2}\n')
+      o.write(f'delete_atoms\t\toverlap {distance:.3f} {g1} {g2}\n')
     if self.EXEC == 1:
         with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
     else:
