@@ -59,7 +59,7 @@ class SIMULATOR:
 
   def INIT_SCRIPT(self, FILE, symbols, unit='metal', style='atomic', pbc=[1,1,1]):
     if self.EXEC == 0:
-      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Initialize "{SCRIPT}"\n')
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Initialize "{self.SCRIPT}"\n')
     else:
       with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : You tried to initialize the script again. You must initialize it once at first.\n')
       sys.exit()
@@ -180,13 +180,19 @@ class SIMULATOR:
     with open(self.SCRIPT,'a') as o: o.write(cmd)
     self.GTHERMO = name
 
-  def tfMC(self, name:str, delta:float, T:float, iteration:int) -> None:
+  def tfMC(self, name:str, delta:float, T:float, iteration:int, ensemble:str='') -> None:
     self.EXEC += 1
     with open(self.SCRIPT,'a') as o:
+      if ensemble =='npt':
+        o.write(f'fix\t\tTHERMOSTAT {self.GTHERMO} npt temp 300 300 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
       o.write(f"fix {name} tfmc {delta} {T} {np.random.randint(low=1,high=1000)} com 1 1 1\n")
       o.write(f"run\t\t{iteration}\n")
+      o.write(f"unfix THERMOSTAT\n")
       o.write(f"unfix {name}\n")
-
+    if self.EXEC == 1:
+        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Perform tfMC simulation {iteration} steps.')
+    else:
+        with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : Perform tfMC simulation {iteration} steps.')
   def NEB(self, FILE, symbols, NEBSTEP):
     self.EXEC += 1
     """
