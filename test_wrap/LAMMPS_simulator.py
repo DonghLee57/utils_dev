@@ -169,18 +169,24 @@ class SIMULATOR:
         with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : Delete overlapping atoms within {distance:.3f} Angstrom.')
 
   def MK_GROUP(self, name, keyword, args):
-    self.EXEC +=1
+    self.EXEC += 1
     with open(self.SCRIPT,'a') as o:
       o.write(f'region\t\tr{name} {keyword} {" ".join(args)}\n') 
       o.write(f'group\t\t{name} region r{name}\n')
 
   def REGROUP(self, name, keyword, names):
-    self.EXEC +=1
+    self.EXEC += 1
     cmd = f'group\t\t{name} {keyword} {" ".join(names)}\n'
     with open(self.SCRIPT,'a') as o: o.write(cmd)
     self.GTHERMO = name
 
-  
+  def tfMC(self, name:str, delta:float, T:float, iteration:int) -> None:
+    self.EXEC += 1
+    with open(self.SCRIPT,'a') as o:
+      o.write(f"fix {name} tfmc {delta} {T} {np.random.randint(low=1,high=1000)} com 1 1 1\n")
+      o.write(f"run\t\t{iteration}\n")
+      o.write(f"unfix {name}\n")
+
   def NEB(self, FILE, symbols, NEBSTEP):
     self.EXEC += 1
     """
@@ -198,7 +204,7 @@ class SIMULATOR:
       o.write('neb\t\t0.0 0.01 100 100 10 each coords_$i.lammps\n')
     """
     
-def C2K(T):
+def C2K(T:float) -> float:
   return T+273.15
   
 def get_sorted_symbols(FILE):
@@ -214,7 +220,7 @@ def get_sorted_symbols(FILE):
   return sorted_symbols
 
 # Matching the number of atom types with the number of elements in NNP
-def NNP_prepare(FILE, NTYPES):
+def NNP_prepare(FILE, NTYPES) -> None:
   with open(FILE,'r') as o: tmp=o.readlines()
   change    = tmp[3].split()
   change[0] = f'{NTYPES}'
@@ -224,23 +230,23 @@ def NNP_prepare(FILE, NTYPES):
       o.write(item)
 
 # Write the part related to potential and atom types in the LAMMPS script
-def set_pot(POT, pot_type, symbols, all_symbols):
+def set_pot(POT, pot_type, symbols, all_symbols) -> str:
   lines, elements, masses, count, bins = '', '', '', 0, []
   for i, item in enumerate(symbols):
     bins.append(item[0])
     elements += f' {item[0]}'
     masses += f'mass\t\t{i+1} {atomic_masses[atomic_numbers[item[0]]]}\n'
   if pot_type == 'NNP':
-    pot_type = 'nn'
-    #pot_type = 'nn/intel' #if SIMD compile
+    ptype = 'nn'
+    #ptype = 'nn/intel' #if SIMD compile
     for i, item in enumerate(all_symbols):
       if not item in bins:
         count    += 1
         elements += f' {item}'
         masses   += f'mass\t\t{count+len(symbols)} {atomic_masses[atomic_numbers[item]]}\n'
-  #elif pot_type == 'tersoff':
-  #  pot_type = 'tersoff'
-  lines += f'pair_style  {pot_type}\npair_coeff  * * "{POT}" {elements}\n'
+  else:
+    ptype = pot_type
+  lines += f'pair_style  {ptype}\npair_coeff  * * "{POT}" {elements}\n'
   lines += masses
   return lines
       
