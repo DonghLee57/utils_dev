@@ -55,6 +55,7 @@ class SIMULATOR:
     self.GTHERMO = 'all'
     self.create_vel = True
     self.write_dump = True
+    self.calc_stress = False
     self.run_MD = True
 
   def INIT_SCRIPT(self, FILE, symbols, unit='metal', style='atomic', pbc=[1,1,1]):
@@ -157,6 +158,20 @@ class SIMULATOR:
     else:
       with open(self.LOG,'a') as o: o.write(f'{self.EXEC:4d} : Quenching with {Qrate} K/ps from {T_init} to {T_end}.\n')
 
+  def SINGLE(self):
+    self.EXEC += 1
+    with open(self.SCRIPT,'a') as o:
+      o.write(f'dump\t\tDUMP all custom {self.DUMPSTEP} dump.lammpstrj id type x y z')
+      if self.calc_stress:
+        o.write(' c_STRESS[*]\n\n')
+      else:
+        o.write('\n\n')
+      o.write('run\t\t1\n')
+    if self.EXEC == 1:
+      with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Single iteration run.\n')
+    else:
+      with open(self.LOG,'a') as o: o.write(f'{self.EXEC:4d} : Single iteration run.\n')
+
   def DEL_OVERLAP(self, distance, g1=None, g2=None):
     self.EXEC +=1
     if g1 == None: g1 = 'all'
@@ -179,6 +194,16 @@ class SIMULATOR:
     cmd = f'group\t\t{name} {keyword} {" ".join(names)}\n'
     with open(self.SCRIPT,'a') as o: o.write(cmd)
     self.GTHERMO = name
+
+  def CALC_STRESS(self):
+    self.EXEC += 1
+    with open(self.SCRIPT,'a') as o:
+      o.write('compute STRESS all stress/atom NULL virial\n')
+    self.calc_stress = True
+    if self.EXEC == 1:
+        with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Calculate per-atom virial stress.')
+    else:
+        with open(self.LOG,'a') as o: o.write(f'\n{self.EXEC:4d} : Calculate per-atom virial stress.')
 
   def tfMC(self, name:str, delta:float, T:float, iteration:int, ensemble:str='') -> None:
     self.EXEC += 1
