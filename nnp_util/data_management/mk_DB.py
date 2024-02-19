@@ -1,6 +1,7 @@
 import sys
 import os, glob
 import sqlite3
+from braceexpand import braceexpand
 
 PRE_PATH =  '/tmp/'
 DB_SAVE  = f'{PRE_PATH}/Lee/my.db'
@@ -61,14 +62,14 @@ def parse_insert(CURSOR, FILE):
                 else:
                     if len(line.split()) == 2 and len(line.split(':')) == 3:
                         [path, slice_idx] = line.split()
-                        # : split X case ?? 
                         [init, end, step] = slice_idx.split(':')
-                        if os.path.isfile(path):
-                            elements = collect_elem_from_outcar(path)     
-                            CURSOR.execute('INSERT INTO mydb (Elements, Structure_type, File_path, init, end, step, comment) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                                          (elements, structure_type, path, init, end, step, comment))
-                        else:
-                            print(f"No OUTCAR: {path}")
+                        for structure_file in list(braceexpand(path)):
+                            if os.path.isfile(structure_file):
+                                elements = collect_elem_from_outcar(structure_file)
+                                CURSOR.execute('INSERT INTO mydb (Elements, Structure_type, File_path, init, end, step, comment) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                                              (elements, structure_type, structure_file, init, end, step, comment))
+                            else:
+                                print(f"No OUTCAR: {path}")
                     else:
                         print(f"Illegal format: {line}" )
 
