@@ -212,7 +212,8 @@ class SIMULATOR:
         o.write(f'fix\t\tTHERMOSTAT {self.GTHERMO} npt temp 300 300 1 iso 0.0 0.0 1000.0 fixedpoint 0 0 0\n')
       o.write(f"fix {name} tfmc {delta} {T} {np.random.randint(low=1,high=1000)} com 1 1 1\n")
       o.write(f"run\t\t{iteration}\n")
-      o.write(f"unfix THERMOSTAT\n")
+      if ensemble =='npt':
+        o.write(f"unfix THERMOSTAT\n")
       o.write(f"unfix {name}\n")
     if self.EXEC == 1:
         with open(self.LOG,'w') as o: o.write(f'{self.EXEC:4d} : Perform tfMC simulation {iteration} steps.')
