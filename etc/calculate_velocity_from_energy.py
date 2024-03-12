@@ -25,5 +25,5 @@ energy *= CONST.e
 velocity = np.sqrt(2*energy/mass)
 print(f"{velocity:.2f} (m/s)")
 
-velocity *= 1E-10/1E-12
+velocity *= 1E10/1E12
 print(f"{velocity:.2f} (Angs/ps)")
