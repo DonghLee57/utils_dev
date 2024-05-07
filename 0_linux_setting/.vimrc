@@ -2,8 +2,9 @@ set nocp
 set backspace=indent,eol,start
 set mouse=a
 
-set autoindent
-set shiftwidth=4
+"set autoindent
+"set shiftwidth=4
+set hlsearch
 
 set laststatus=2
 set statusline=\ %F\ %=Position\ %=%l:%v\
