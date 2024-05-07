@@ -1,0 +1,49 @@
+############################################
+# Starting parameters for VASP calculation #
+############################################
+  SYSTEM = testMD                              # Title
+  ISTART = 0                                   # 0: from INIWAV, 1,2,3: Continuation Job
+  INIWAV = 1                                   # 0: Jellium Orbitals, 1: Random Numbers
+  NWRITE = 2                                   # 0,1: Lond MD, 2: Default
+  ICHARG = 2                                   # 0: from WAVECAR, 1: from CHGCAR, 2: Atomic Charge Density   
+
+#############                                                                                                                   
+# Magnetism #                                                                                                                   
+#############                                                                                                                   
+  ISPIN  = 1                                   # 1: non spin-polarization, 2: spin-polarization (collinear)
+
+###################################                                                                                             
+# Electronic Minimization Methods #                                                                                             
+###################################                                                                                             
+  ENCUT  = 400                                 # Cutoff Energy for Planewave Basis Set
+  PREC   = Normal                              # NORMAL | ACCURATE 
+  NELM   = 100                                 # Maximum Number of Electronic SCF
+  NELMDL = -5                                  # Number of non-SCF Steps
+  ADDGRID= .T.                                 # .TRUE.: Additional Support Grid is used for Evaluation of Augmentation Charges
+  EDIFF  = 1E-6                                # Energy Criteria for Electronic SCF
+  ALGO   = Normal                              # Electronic Minimisation Algorithm
+  LREAL  = Auto                                # Projection Operators in Real-Space (Auto) or in Reciprocal-Space (.FALSE.)
+  ISMEAR = 0                                   # How Partial Occupancies are set for Each Orbital
+  SIGMA  = 0.05                                # Width of Smearing in eV
+                                                                                                                                                                                                                        
+######################                                                                                                            
+# Ionic Minimization #                                                                                                             
+######################                                                                                                             
+  NSW    = 50                                 # Maximum Number of Ionic Steps
+  ISIF   = 2                                   # Ionic Relaxation Condition about Stree Tensor and DOF
+  IBRION = 0                                   # -1: no update, 0: MD, 1: RMM-DIIS, 2: CG, 3: Damped-MD, 5-8: Phonon Cal.
+  POTIM = 1                                 # Relaxation: Step Width Scaling, Phonon: Ionic Displacements, MD: Time Step
+                                                                                                                              
+################                                                                                                                
+# Ab initio MD #                                                                                                                
+################                                                                                                                
+ MDALGO = 1                                   # NVE setting
+ ANDERSEN_PROB = 0.0
+                                                                                                                                                                                                                                                                                                  
+################                                                                                                                                           
+# Write Output #                                                                                                                                           
+################                                                                                                                                           
+  LCHARG = .F.                                 # .TRUE.: Charge-Densities are written to CHG and CHGCAR
+  LWAVE  = .F.                                 # .TRUE.: Wavefunctions are written to WAVECAR
+  LVTOT  = .F.                                 # .TRUE.: Total Local Potential written to LOCPOT
+  LVHAR  = .F.                                 # .TRUE.: Ionic + Hartree, .FALSE.:Ionic + Hartree + XC
