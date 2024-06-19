@@ -19,6 +19,7 @@ def check_outcar(PATH):
         if 'Iteration' in line:
             if NELM == line[3][:-1]:
                 print(f"!!! SCF NOT CONVERGED: {PATH} !!!")
+                return 0
 #--------------------------------------------------------------------------------------
 if __name__ == "__main__":
     main()
