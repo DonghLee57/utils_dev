@@ -1,0 +1,7 @@
+# LAMMPS indent
+# https://matsci.org/t/indentation-force-and-pressure-along-indentation-direction-decreases/42966/2
+# 
+# https://docs.lammps.org/fix_indent.html
+# References 
+# https://www.sciencedirect.com/science/article/pii/S0042207X2030021X
+# https://www.sciencedirect.com/science/article/pii/S2352492823020044
