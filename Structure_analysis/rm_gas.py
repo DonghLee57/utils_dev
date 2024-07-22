@@ -12,8 +12,8 @@ rank = comm.Get_rank()
 # Pre-defined parameters
 threshold=10
 # pairs should be in atomic number order.
-pair_cutoffs = {['Si','Si']:2.4,
-                ['H','H']: 1.0}
+pair_cutoffs = {('Si','Si'):2.4,
+                ('H','H'): 1.0}
 default_cutoff = 2.0
 
 #
@@ -66,12 +66,11 @@ def create_graph_object_new(filename, pair_cutoffs):
         local_distances = atoms.get_distances(i, range(num_atoms), mic=True)
         for j in range(num_atoms):
             if i != j:
-                pairs = [atoms[i].symbol, atoms[j].symbol]
-                pairs.sort(key=lambda x: atomic_numbers[x])
+                pairs = (atoms[i].symbol, atoms[j].symbol)
                 # if pairs not in pair_cutoffs.keys(), cutoff = default_cutoff.
                 cutoff = pair_cutoffs.get(pairs, default_cutoff)
-                if local_distances[i-start][j] <= cutoff:
-                    local_indices.append((i, j))
+                if local_distances[j] <= cutoff:
+                    local_indices.append((start+i, j))
 
     all_indices = comm.gather(local_indices, root=0)
     if rank == 0:
