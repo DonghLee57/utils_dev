@@ -74,8 +74,7 @@ def create_graph_object_new(filename, pair_cutoffs):
 
     all_indices = comm.gather(local_indices, root=0)
     if rank == 0:
-        edge_indices = [pair for sublist in all_indices for pair in sublist]
-        edge_index_tensor = torch.tensor(edge_indices, dtype=torch.long).t().contiguous()
+        edge_index_tensor = torch.tensor(all_indices, dtype=torch.long).t().contiguous()
         node_features = torch.tensor(atoms.numbers, dtype=torch.float)
         graph = Data(x=node_features, edge_index=edge_index_tensor)
         return graph, atoms
