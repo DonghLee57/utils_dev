@@ -2,16 +2,21 @@ from mpi4py import MPI
 import sys
 import numpy as np
 from ase.io import read, write
-from ase.neighborlist import neighbor_list
+from ase.data import atomic_numbers
 import torch
 from torch_geometric.data import Data
-import matplotlib.pyplot as plt
-
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
-threshold=10
 
+# Pre-defined parameters
+threshold=10
+# pairs should be in atomic number order.
+pair_cutoffs = {['Si','Si']:2.4,
+                ['H','H']: 1.0}
+default_cutoff = 2.0
+
+#
 class UnionFind:
     def __init__(self, size):
         self.root = np.arange(size, dtype=int)
@@ -19,13 +24,12 @@ class UnionFind:
 
     def find(self, x):
         if self.root[x] != x:
-            self.root[x] = self.find(self.root[x])  # 경로 압축
+            self.root[x] = self.find(self.root[x])
         return self.root[x]
 
     def union(self, x, y):
         rootX = self.find(x)
         rootY = self.find(y)
-
         if rootX != rootY:
             if self.rank[rootX] > self.rank[rootY]:
                 self.root[rootY] = rootX
@@ -48,7 +52,36 @@ def create_graph_object(filename):
     edge_index = torch.tensor([i, j], dtype=torch.long)
     graph = Data(x=node_features, edge_index=edge_index)
     return graph, atoms
-  
+
+def create_graph_object_new(filename, pair_cutoffs):
+    atoms = read(filename)
+    num_atoms = len(atoms)
+
+    atoms_per_proc = num_atoms // size
+    start = rank * atoms_per_proc
+    end = (rank + 1) * atoms_per_proc if rank != size - 1 else num_atoms
+
+    local_indices = []
+    for i in range(start, end):
+        local_distances = atoms.get_distances(i, range(num_atoms), mic=True)
+        for j in range(num_atoms):
+            if i != j:
+                pairs = [atoms[i].symbol, atoms[j].symbol]
+                pairs.sort(key=lambda x: atomic_numbers[x])
+                # if pairs not in pair_cutoffs.keys(), cutoff = default_cutoff.
+                cutoff = pair_cutoffs.get(pairs, default_cutoff)
+                if local_distances[i-start][j] <= cutoff:
+                    local_indices.append((i, j))
+
+    all_indices = comm.gather(local_indices, root=0)
+    if rank == 0:
+        edge_indices = [pair for sublist in all_indices for pair in sublist]
+        edge_index_tensor = torch.tensor(edge_indices, dtype=torch.long).t().contiguous()
+        node_features = torch.tensor(atoms.numbers, dtype=torch.float)
+        graph = Data(x=node_features, edge_index=edge_index_tensor)
+        return graph, atoms
+    return None, None
+
 def main():
     """
     # example
@@ -63,30 +96,17 @@ def main():
     write('test.vasp',images=slab,format='vasp')
     """
 
-    # 파일명 지정 및 그래프 객체 생성
     filename = sys.argv[1]
-
-    """
-    # ver.1
-    graph, atoms = create_graph_object(filename)
-    num_nodes = graph.num_nodes  
-    edges = graph.edge_index.t().tolist()
-    num_components = process_graph(edges, num_nodes)
-    print("Number of connected components:", num_components)
-    local_edges = np.array_split(edges, size)[rank]
-    local_uf = process_graph(local_edges, num_nodes)
-    #
-    """
-    # ver.2
+    #graph, atoms = create_graph_object(filename)
+    graph, atoms = create_graph_object_new(filename)
     if rank == 0:
-        graph, atoms = create_graph_object(filename)
         num_nodes = graph.num_nodes  
         edges = graph.edge_index.t().tolist()
-        local_edges = np.array_split(edges, size)[rank]
+        local_edges = np.array_split(edges, size)
     else:
-        local_edges = None
-        atoms = None
         num_nodes = None
+        local_edges = None
+
     num_nodes = comm.bcast(num_nodes, root=0)
     local_edges = comm.scatter(local_edges, root=0)
     local_uf = process_graph(local_edges, num_nodes)
