@@ -13,8 +13,8 @@ rank = comm.Get_rank()
 threshold=10
 # pairs should be in atomic number order.
 pair_cutoffs = {('Si','Si'):2.4,
-                ('H','H'): 1.0}
-default_cutoff = 2.0
+                ('H','H'): 2.4}
+default_cutoff = 2.4
 
 #
 class UnionFind:
@@ -63,11 +63,12 @@ def create_graph_object(filename, pair_cutoffs):
                 # if pairs not in pair_cutoffs.keys(), cutoff = default_cutoff.
                 cutoff = pair_cutoffs.get(pairs, default_cutoff)
                 if local_distances[j] <= cutoff:
-                    local_indices.append((start+i, j))
+                    local_indices.append((i, j))
 
     all_indices = comm.gather(local_indices, root=0)
     if rank == 0:
-        edge_index_tensor = torch.tensor(all_indices, dtype=torch.long).t().contiguous()
+        edge_indices = [pair for sublist in all_indices for pair in sublist]
+        edge_index_tensor = torch.tensor(edge_indices, dtype=torch.long).t().contiguous()
         node_features = torch.tensor(atoms.numbers, dtype=torch.float)
         graph = Data(x=node_features, edge_index=edge_index_tensor)
         return graph, atoms
@@ -88,11 +89,20 @@ def main():
     """
 
     filename = sys.argv[1]
-    graph, atoms = create_graph_object(filename, pair_cutoffs)
-    num_nodes = graph.num_nodes
-    edges = graph.edge_index.t().tolist()
-    local_edges = np.array_split(edges, size)[rank]
-    local_uf = process_graph(local_edges, num_nodes)
+    if rank == 0:
+        graph, atoms = create_graph_object(filename, pair_cutoffs)
+        num_nodes = graph.num_nodes
+        edges = graph.edge_index.t().tolist()
+        local_edges = np.array_split(edges, size)
+    else:
+        atoms = None
+        num_nodes = None
+        local_edges = None
+
+    num_nodes = comm.bcast(num_nodes, root=0)
+    local_edges = comm.scatter(local_edges, root=0)
+    local_uf = process_graph(local_edges[rank], num_nodes)
+
     global_roots = np.empty(num_nodes, dtype=int)
     comm.Allreduce(local_uf.root, global_roots, op=MPI.MAX)
 
