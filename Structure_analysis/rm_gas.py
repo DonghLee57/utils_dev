@@ -47,7 +47,7 @@ def process_graph(edges, num_nodes):
 
 def create_graph_object(filename, pair_cutoffs):
     atoms = read(filename)
-    #atoms = read(filename, styel='atomic', format='lammps-data')
+    #atoms = read(filename, style='atomic', format='lammps-data')
     num_atoms = len(atoms)
 
     atoms_per_proc = num_atoms // size
@@ -101,7 +101,7 @@ def main():
 
     num_nodes = comm.bcast(num_nodes, root=0)
     local_edges = comm.scatter(local_edges, root=0)
-    local_uf = process_graph(local_edges[rank], num_nodes)
+    local_uf = process_graph(local_edges, num_nodes)
 
     global_roots = np.empty(num_nodes, dtype=int)
     comm.Allreduce(local_uf.root, global_roots, op=MPI.MAX)
