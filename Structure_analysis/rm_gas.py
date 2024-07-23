@@ -45,16 +45,9 @@ def process_graph(edges, num_nodes):
         uf.union(x, y)
     return uf
 
-def create_graph_object(filename):
+def create_graph_object(filename, pair_cutoffs):
     atoms = read(filename)
-    i, j, distances = neighbor_list('ijd', atoms, cutoff=3.0)
-    node_features = torch.tensor(atoms.numbers, dtype=torch.float)
-    edge_index = torch.tensor([i, j], dtype=torch.long)
-    graph = Data(x=node_features, edge_index=edge_index)
-    return graph, atoms
-
-def create_graph_object_new(filename, pair_cutoffs):
-    atoms = read(filename)
+    #atoms = read(filename, styel='atomic', format='lammps-data')
     num_atoms = len(atoms)
 
     atoms_per_proc = num_atoms // size
@@ -95,40 +88,41 @@ def main():
     """
 
     filename = sys.argv[1]
-    #graph, atoms = create_graph_object(filename)
-    graph, atoms = create_graph_object_new(filename)
-    if rank == 0:
-        num_nodes = graph.num_nodes  
-        edges = graph.edge_index.t().tolist()
-        local_edges = np.array_split(edges, size)
-    else:
-        num_nodes = None
-        local_edges = None
-
-    num_nodes = comm.bcast(num_nodes, root=0)
-    local_edges = comm.scatter(local_edges, root=0)
+    graph, atoms = create_graph_object(filename, pair_cutoffs)
+    num_nodes = graph.num_nodes
+    edges = graph.edge_index.t().tolist()
+    local_edges = np.array_split(edges, size)[rank]
     local_uf = process_graph(local_edges, num_nodes)
-    #
-  
     global_roots = np.empty(num_nodes, dtype=int)
     comm.Allreduce(local_uf.root, global_roots, op=MPI.MAX)
-  
+
     if rank == 0:
         final_uf = UnionFind(num_nodes)
         final_uf.root = global_roots
-        unique_components = len(set(final_uf.find(x) for x in range(num_nodes)))
-        print("Number of connected components:", unique_components)
+        unique_components = set(final_uf.find(x) for x in range(num_nodes))
+        component_dict = {root: [] for root in unique_components}
+
+        for node in range(num_nodes):
+            root = final_uf.find(node)
+            component_dict[root].append(node)
+
+        print("Number of connected components:", len(unique_components))
+
         nodes_to_remove = []
-        for component in unique_components:
+        for root, component in component_dict.items():
             component_size = len(component)
             print("Component size:", component_size)
             if component_size <= threshold:
-                print("Small component atoms:", atoms[np.array(list(component))].symbols)
+                print("Small component atoms:", atoms[np.array(component)].symbols)
                 nodes_to_remove.extend(component)
 
         if nodes_to_remove:
             atoms = atoms[[i for i in range(len(atoms)) if i not in nodes_to_remove]]
-    write('after.vasp',images=atoms, format='vasp')
+
+        write('output.vasp', images=atoms, format='vasp', parallel=False)
+        #write('output.lammps', images=atoms, format='lammps-data', parallel=False)
+        #write('output.extxyz', images=atoms, format='extxyz', parallel=False)
+    return 0
 
 if __name__ == "__main__":
     main()
