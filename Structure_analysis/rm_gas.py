@@ -89,19 +89,18 @@ def main():
     """
 
     filename = sys.argv[1]
+    graph, atoms = create_graph_object(filename, pair_cutoffs)
     if rank == 0:
-        graph, atoms = create_graph_object(filename, pair_cutoffs)
         num_nodes = graph.num_nodes
         edges = graph.edge_index.t().tolist()
-        local_edges = np.array_split(edges, size)
     else:
         atoms = None
         num_nodes = None
-        local_edges = None
 
     num_nodes = comm.bcast(num_nodes, root=0)
-    local_edges = comm.scatter(local_edges, root=0)
-    local_uf = process_graph(local_edges, num_nodes)
+    edges = comm.bcast(edges, root=0)
+
+    local_uf = process_graph(edges, num_nodes)
 
     global_roots = np.empty(num_nodes, dtype=int)
     comm.Allreduce(local_uf.root, global_roots, op=MPI.MAX)
