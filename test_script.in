@@ -1,0 +1,43 @@
+# LAMMPS script for NVT and minimization of interface regions
+
+# 초기화
+units metal
+dimension 3
+boundary p p p
+
+# 원자 정보 읽기
+read_data combined_structure.data
+
+# 포텐셜 설정 (예시로 EAM 포텐셜 사용)
+pair_style eam/alloy
+pair_coeff * * potential.eam.alloy ElementA ElementB
+
+# 그룹 정의
+variable z_min_25 equal 0.25*zhi - 2.5  # interface 두께의 절반을 뺌
+variable z_max_25 equal 0.25*zhi + 2.5  # interface 두께의 절반을 더함
+variable z_min_75 equal 0.75*zhi - 2.5
+variable z_max_75 equal 0.75*zhi + 2.5
+
+group interface_25 region interface_25_region
+group interface_75 region interface_75_region
+region interface_25_region block INF INF INF INF ${z_min_25} ${z_max_25}
+region interface_75_region block INF INF INF INF ${z_min_75} ${z_max_75}
+
+# NVT 설정
+fix nvt_25 interface_25 nvt temp 300.0 300.0 100.0
+fix nvt_75 interface_75 nvt temp 300.0 300.0 100.0
+
+# 시뮬레이션 실행
+timestep 0.001  # 1 fs
+thermo 1000
+run 10000  # 10 ps
+
+# NVT 해제
+unfix nvt_25
+unfix nvt_75
+
+# 에너지 최소화
+minimize 1.0e-4 1.0e-6 1000 10000
+
+# 결과 출력
+write_data minimized_structure.data
