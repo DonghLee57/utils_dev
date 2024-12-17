@@ -1,7 +1,0 @@
-1. class (lite version - conveninent)
-
-2. class mpi (?)
-
-3. ctypes / cffi (performance) 
-
-4. ctypes / cffi (omp performance) 
