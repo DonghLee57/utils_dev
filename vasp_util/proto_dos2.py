@@ -1,24 +1,23 @@
-# POSCAR & DOSCAR for (Partial) DOS
-
+# POSCAR & DOSCAR & OUTCAR
 # PROCAR for IPR (should be checked)
-
-# try-except when file read
 
 import sys, subprocess
 import numpy as np
+from ase.io import read
 import matplotlib.pyplot as plt
 import re
 
-def main():
-    # User setting
-    energy_rng = [-3, 3]
-    plot_pdos = 1
-    plot_ldos = 0
-    plot_ipr = 0
-    norbit = 9 # s, py, pz, px, dxy, dyz, dz2, dxz, x2-y2
-    fs = 12
+# ================================================================
+# User settings (can be moved to command line arguments or config)
+# ================================================================
+energy_rng = [-3, 3]
+plot_pdos = 1
+plot_ldos = 0
+plot_ipr = 0
+norbit = 9 # s, py, pz, px, dxy, dyz, dz2, dxz, x2-y2
+fs = 12
 
-    # Initialization
+def main():
     symbols, ntypes = get_poscar_header('POSCAR')
     my_dos = DOS(doscar='DOSCAR', norbit=norbit)
     my_dos.ISPIN = int(subprocess.check_output('grep ISPIN OUTCAR'.split(),universal_newlines=True).split()[2])
@@ -97,8 +96,9 @@ def main():
     plt.tight_layout()
     plt.show()
 
-#--------------------------------------------------------------------------------------
-
+# ================================================================
+# Core classes & functions
+# ================================================================
 class DOS:
     def __init__(self, doscar='DOSCAR', norbit=9):
         self.NIONS = 0
@@ -195,7 +195,8 @@ def get_poscar_header(poscar):
         print('Selective dynamics <-- optional')
         print(' Ion positions...')
 
-def get_reference_potential(outcar='OUTCAR', poscar='POSCAR'):
+
+def get_reference_potential(ref_element, outcar='OUTCAR', poscar='POSCAR'):
     """
     Extracts the reference potential from the 'average (electrostatic) potential at core' section of OUTCAR.
     Uses grep to extract the relevant lines based on the total number of atoms from POSCAR,
@@ -242,9 +243,10 @@ def get_reference_potential(outcar='OUTCAR', poscar='POSCAR'):
                 potentials.append(float(potential))
             if len(pairs) == 0:
                 break
-
+    potentials = np.array(potentials)
+    selected = np.where( np.array(read(poscar).get_chemical_symbols()) == ref_element )[0]
     if len(potentials) > 0:
-        return potentials[0]  # or np.mean(potentials) if average is preferred
+        return np.mean(potentials[selected])
     else:
         raise ValueError("No potential values found in OUTCAR section.")
 
